@@ -1,0 +1,12 @@
+/*
+ * Canvas chrome for the Filament Page Builder.
+ *
+ * Scoped under .fpb- so panel styles and the consuming application's block styles
+ * cannot bleed into one another. The application supplies its own block styling;
+ * this file only styles the builder around it.
+ */
+.fpb-canvas { position: relative; }
+
+.fpb-block { position: relative; outline: 2px solid transparent; transition: outline-color 0.15s; }
+.fpb-block:hover { outline-color: rgba(120, 120, 120, 0.35); }
+.fpb-block[data-selected="true"] { outline-color: currentColor; }
