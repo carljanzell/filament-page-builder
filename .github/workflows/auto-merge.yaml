@@ -1,0 +1,81 @@
+name: Auto-merge dev to main
+
+# Mirrors the deployment practice used by the consuming application: work lands on
+# dev, and a green build promotes it to main automatically.
+#
+# Unlike that application, main here does not deploy anywhere — this is a library, so
+# the merge only moves the release branch forward.
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  promote:
+    name: Promote dev to main
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Count commits ahead of main
+        id: ahead
+        run: |
+          git fetch origin main dev
+          echo "count=$(git rev-list --count origin/main..origin/dev)" >> $GITHUB_OUTPUT
+
+      - name: Open or update the pull request
+        if: steps.ahead.outputs.count != '0'
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+            const existing = await github.rest.pulls.list({
+              owner, repo, head: `${owner}:dev`, base: 'main', state: 'open',
+            });
+
+            if (existing.data.length > 0) {
+              core.setOutput('number', existing.data[0].number);
+              return;
+            }
+
+            const created = await github.rest.pulls.create({
+              owner, repo, head: 'dev', base: 'main',
+              title: `Promote dev to main (${new Date().toISOString().slice(0, 10)})`,
+              body: 'Automated promotion of `dev` to `main`.',
+            });
+
+            core.setOutput('number', created.data.number);
+
+      - name: Merge when mergeable
+        if: steps.ahead.outputs.count != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+            const number = Number('${{ steps.pr.outputs.number }}');
+
+            // Mergeability is computed asynchronously by GitHub.
+            let pr;
+            for (let i = 0; i < 10; i++) {
+              pr = (await github.rest.pulls.get({ owner, repo, pull_number: number })).data;
+              if (pr.mergeable !== null) break;
+              await new Promise(r => setTimeout(r, 2000));
+            }
+
+            if (pr.mergeable !== true) {
+              core.notice(`PR #${number} is not mergeable (state: ${pr.mergeable_state}); leaving it open.`);
+              return;
+            }
+
+            await github.rest.pulls.merge({ owner, repo, pull_number: number, merge_method: 'merge' });
+            core.notice(`Merged PR #${number}.`);

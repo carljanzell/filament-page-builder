@@ -2,6 +2,9 @@
 
 namespace CarlJanzell\FilamentPageBuilder;
 
+use Filament\Support\Assets\Css;
+use Filament\Support\Assets\Js;
+use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Support\ServiceProvider;
 
 class PageBuilderServiceProvider extends ServiceProvider
@@ -29,13 +32,13 @@ class PageBuilderServiceProvider extends ServiceProvider
      */
     protected function registerAssets(): void
     {
-        if (! class_exists(\Filament\Support\Facades\FilamentAsset::class)) {
+        if (! class_exists(FilamentAsset::class)) {
             return;
         }
 
-        \Filament\Support\Facades\FilamentAsset::register([
-            \Filament\Support\Assets\Js::make('page-builder', __DIR__.'/../resources/js/page-builder.js'),
-            \Filament\Support\Assets\Css::make('page-builder', __DIR__.'/../resources/css/page-builder.css'),
+        FilamentAsset::register([
+            Js::make('page-builder', __DIR__.'/../resources/js/page-builder.js'),
+            Css::make('page-builder', __DIR__.'/../resources/css/page-builder.css'),
         ], static::PACKAGE);
     }
 }

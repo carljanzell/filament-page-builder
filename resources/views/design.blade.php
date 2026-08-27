@@ -1,0 +1,119 @@
+<x-filament-panels::page>
+    <div
+        class="fpb"
+        x-data="pageBuilderCanvas()"
+        wire:key="fpb-{{ $this->getRecord()->getKey() }}"
+    >
+        {{-- Palette --}}
+        <aside class="fpb-panel fpb-palette">
+            <h2 class="fpb-panel-title">Blocks</h2>
+            <p class="fpb-panel-hint">Drag onto the page, or click to append.</p>
+
+            <ul class="fpb-palette-list">
+                @foreach ($this->palette as $item)
+                    <li>
+                        <button
+                            type="button"
+                            class="fpb-palette-item"
+                            draggable="true"
+                            data-type="{{ $item['type'] }}"
+                            x-on:dragstart="startInsert($event, '{{ $item['type'] }}')"
+                            x-on:dragend="clearDrag()"
+                            wire:click="insertBlock('{{ $item['type'] }}')"
+                        >
+                            @if ($item['icon'])
+                                <x-filament::icon :icon="$item['icon']" class="fpb-palette-icon" />
+                            @endif
+                            <span>{{ $item['label'] }}</span>
+                        </button>
+                    </li>
+                @endforeach
+            </ul>
+        </aside>
+
+        {{-- Canvas --}}
+        <main class="fpb-canvas-wrap">
+            <div class="fpb-toolbar">
+                <span class="fpb-status" @class(['fpb-status-dirty' => $this->isDirty])>
+                    {{ $this->isDirty ? 'Unsaved changes' : 'All changes saved' }}
+                </span>
+
+                <div class="fpb-toolbar-actions">
+                    <x-filament::button
+                        tag="a"
+                        href="{{ static::getResource()::getUrl('edit', ['record' => $this->getRecord()]) }}"
+                        color="gray"
+                        size="sm"
+                    >
+                        Form editor
+                    </x-filament::button>
+
+                    <x-filament::button
+                        wire:click="save"
+                        wire:loading.attr="disabled"
+                        size="sm"
+                    >
+                        Save layout
+                    </x-filament::button>
+                </div>
+            </div>
+
+            <div
+                class="fpb-canvas"
+                x-on:dragover.prevent="onDragOver($event)"
+                x-on:drop.prevent="onDrop($event)"
+                x-on:dragleave="onDragLeave($event)"
+            >
+                {{-- Application supplied design tokens and block styles, so the canvas
+                     renders blocks exactly as the public site does. --}}
+                @if ($stylesView = $this->canvasStylesView())
+                    @include($stylesView)
+                @endif
+                @forelse ($this->renderableBlocks as $index => $block)
+                    <div
+                        class="fpb-block"
+                        data-id="{{ $block['id'] }}"
+                        data-index="{{ $index }}"
+                        draggable="true"
+                        @if ($this->selectedId === $block['id']) data-selected="true" @endif
+                        x-on:dragstart="startMove($event, '{{ $block['id'] }}')"
+                        x-on:dragend="clearDrag()"
+                        wire:click="selectBlock('{{ $block['id'] }}')"
+                        wire:key="fpb-block-{{ $block['id'] }}"
+                    >
+                        <div class="fpb-block-bar">
+                            <span class="fpb-block-label">{{ $block['label'] }}</span>
+                            <span class="fpb-block-tools">
+                                <button type="button" title="Duplicate"
+                                        wire:click.stop="duplicateBlock('{{ $block['id'] }}')">⧉</button>
+                                <button type="button" title="Delete"
+                                        wire:click.stop="removeBlock('{{ $block['id'] }}')">✕</button>
+                            </span>
+                        </div>
+
+                        <div class="fpb-block-body">
+                            @if ($block['view'])
+                                <x-dynamic-component :component="$block['view']" :data="$block['data']" />
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <p class="fpb-empty">This page has no blocks yet. Drag one in from the left.</p>
+                @endforelse
+            </div>
+        </main>
+
+        {{-- Inspector --}}
+        <aside class="fpb-panel fpb-inspector">
+            <h2 class="fpb-panel-title">
+                {{ $this->selectedId ? 'Block settings' : 'Nothing selected' }}
+            </h2>
+
+            @if ($this->selectedId)
+                {{ $this->form }}
+            @else
+                <p class="fpb-panel-hint">Click a block on the page to edit it.</p>
+            @endif
+        </aside>
+    </div>
+</x-filament-panels::page>

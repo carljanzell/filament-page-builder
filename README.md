@@ -3,9 +3,10 @@
 A drag-and-drop visual page builder for [Filament](https://filamentphp.com), storing page
 content as an ordered array of typed blocks in a single JSON column.
 
-> **Status: scaffold.** The plugin contract, block registry and service provider are in
-> place. The canvas itself is not built yet — see [VISUAL_BUILDER_PLAN.md](VISUAL_BUILDER_PLAN.md)
-> for the staged plan.
+> **Status: Stage A complete.** The drag-and-drop canvas works — palette, reordering,
+> insert, duplicate, delete, selection and a live inspector, all persisting to the same
+> JSON the form editor uses. Stages B–D (inline text editing, layout controls, reusable
+> sections) are still to come. See [VISUAL_BUILDER_PLAN.md](VISUAL_BUILDER_PLAN.md).
 
 ## Why
 
@@ -57,6 +58,45 @@ class Page extends Model
 {
     use HasBlocks;
 }
+```
+
+## The canvas
+
+Extend the packaged page and bind it to your resource:
+
+```php
+use CarlJanzell\FilamentPageBuilder\Filament\Pages\DesignPage as BaseDesignPage;
+
+class DesignPage extends BaseDesignPage
+{
+    protected static string $resource = PageResource::class;
+}
+```
+
+Register it as a resource page and the canvas is available at
+`/admin/pages/{record}/design`:
+
+```php
+public static function getPages(): array
+{
+    return [
+        // …
+        'design' => DesignPage::route('/{record}/design'),
+    ];
+}
+```
+
+Blocks are mutated in memory and written on an explicit save, so a drag never waits on a
+database round trip.
+
+### Making the canvas match your site
+
+The package styles the builder chrome but knows nothing about how you style your blocks.
+Point it at a view that supplies your design tokens and block stylesheet:
+
+```php
+FilamentPageBuilderPlugin::make()
+    ->canvasStylesView('filament.pages.canvas-styles')
 ```
 
 ## Defining a block

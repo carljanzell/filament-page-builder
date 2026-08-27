@@ -17,6 +17,8 @@ class FilamentPageBuilderPlugin implements Plugin
 
     protected string $blocksAttribute = 'blocks';
 
+    protected ?string $canvasStylesView = null;
+
     public static function make(): static
     {
         return app(static::class);
@@ -70,6 +72,25 @@ class FilamentPageBuilderPlugin implements Plugin
         $this->blocksAttribute = $attribute;
 
         return $this;
+    }
+
+    /**
+     * A view rendered inside the canvas, before the blocks.
+     *
+     * The package styles the builder chrome but knows nothing about how a consuming
+     * application styles its own blocks. This is where the application injects its
+     * design tokens and block stylesheet so the canvas matches the public site.
+     */
+    public function canvasStylesView(?string $view): static
+    {
+        $this->canvasStylesView = $view;
+
+        return $this;
+    }
+
+    public function getCanvasStylesView(): ?string
+    {
+        return $this->canvasStylesView;
     }
 
     public function getRecordModel(): ?string

@@ -1,12 +1,90 @@
 /*
- * Canvas chrome for the Filament Page Builder.
+ * Chrome for the page builder canvas.
  *
- * Scoped under .fpb- so panel styles and the consuming application's block styles
- * cannot bleed into one another. The application supplies its own block styling;
- * this file only styles the builder around it.
+ * Everything is scoped under .fpb so the panel's styles and the consuming application's
+ * block styles cannot bleed into one another. The application supplies its own block
+ * styling; this file only styles the builder around it.
  */
-.fpb-canvas { position: relative; }
+.fpb {
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 1fr) 22rem;
+    gap: 1rem;
+    align-items: start;
+}
 
-.fpb-block { position: relative; outline: 2px solid transparent; transition: outline-color 0.15s; }
-.fpb-block:hover { outline-color: rgba(120, 120, 120, 0.35); }
-.fpb-block[data-selected="true"] { outline-color: currentColor; }
+.fpb-panel {
+    position: sticky;
+    top: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    border-radius: 0.75rem;
+    background: var(--fpb-panel-bg, rgba(255, 255, 255, 0.6));
+    max-height: calc(100vh - 8rem);
+    overflow-y: auto;
+}
+
+.fpb-panel-title { font-weight: 600; margin-bottom: 0.25rem; }
+.fpb-panel-hint { font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.75rem; }
+
+.fpb-palette-list { display: grid; gap: 0.375rem; list-style: none; padding: 0; margin: 0; }
+.fpb-palette-item {
+    display: flex; align-items: center; gap: 0.5rem; width: 100%;
+    padding: 0.5rem 0.625rem; cursor: grab; text-align: left;
+    border: 1px solid rgba(128, 128, 128, 0.25); border-radius: 0.5rem;
+    font-size: 0.85rem; background: transparent;
+}
+.fpb-palette-item:hover { border-color: currentColor; }
+.fpb-palette-item:active { cursor: grabbing; }
+.fpb-palette-icon { width: 1rem; height: 1rem; flex: none; }
+
+.fpb-canvas-wrap { min-width: 0; }
+
+.fpb-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; margin-bottom: 0.75rem;
+}
+.fpb-toolbar-actions { display: flex; gap: 0.5rem; }
+.fpb-status { font-size: 0.8rem; opacity: 0.7; }
+.fpb-status-dirty { opacity: 1; font-weight: 600; }
+
+.fpb-canvas {
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    min-height: 20rem;
+    background: #fff;
+}
+
+.fpb-block { position: relative; cursor: grab; }
+.fpb-block:active { cursor: grabbing; }
+.fpb-block::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    outline: 2px solid transparent; outline-offset: -2px; transition: outline-color 0.15s;
+}
+.fpb-block:hover::after { outline-color: rgba(120, 120, 120, 0.5); }
+.fpb-block[data-selected="true"]::after { outline-color: #2563eb; }
+
+.fpb-block-bar {
+    position: absolute; top: 0; right: 0; z-index: 2;
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.25rem 0.5rem; font-size: 0.7rem;
+    background: rgba(17, 17, 17, 0.75); color: #fff;
+    border-bottom-left-radius: 0.375rem;
+    opacity: 0; transition: opacity 0.15s;
+}
+.fpb-block:hover .fpb-block-bar,
+.fpb-block[data-selected="true"] .fpb-block-bar { opacity: 1; }
+.fpb-block-label { text-transform: uppercase; letter-spacing: 0.04em; }
+.fpb-block-tools button { color: #fff; padding: 0 0.2rem; cursor: pointer; background: none; border: 0; }
+.fpb-block-tools button:hover { color: #fca5a5; }
+
+.fpb-block-body { pointer-events: none; }
+
+.fpb-drop-marker { height: 3px; background: #2563eb; margin: -1px 0; }
+
+.fpb-empty { padding: 3rem 1rem; text-align: center; opacity: 0.6; font-size: 0.9rem; }
+
+@media (max-width: 1280px) {
+    .fpb { grid-template-columns: 1fr; }
+    .fpb-panel { position: static; max-height: none; }
+}

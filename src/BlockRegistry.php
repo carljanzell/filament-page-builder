@@ -73,7 +73,9 @@ class BlockRegistry
      */
     public function view(?string $type): ?string
     {
-        return $this->find($type)?->view();
+        $block = $this->find($type);
+
+        return $block === null ? null : $block::view();
     }
 
     /**
@@ -81,6 +83,8 @@ class BlockRegistry
      */
     public function fileFields(?string $type): array
     {
-        return $this->find($type)?->fileFields() ?? [];
+        $block = $this->find($type);
+
+        return $block === null ? [] : $block::fileFields();
     }
 }
