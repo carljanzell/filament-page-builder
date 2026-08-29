@@ -5,8 +5,10 @@ content as an ordered array of typed blocks in a single JSON column.
 
 > **Status: Stage A complete.** The drag-and-drop canvas works — palette, reordering,
 > insert, duplicate, delete, selection and a live inspector, all persisting to the same
-> JSON the form editor uses. Stages B–D (inline text editing, layout controls, reusable
-> sections) are still to come. See [VISUAL_BUILDER_PLAN.md](VISUAL_BUILDER_PLAN.md).
+> JSON the form editor uses. It still lives *inside* a Filament resource page, not as
+> front-of-site live editing. Stages E0–E5 (fullscreen shell, Interact/Select, public
+> layout, front-end Edit) and B–D (inline text, layout controls, reusable sections)
+> are the roadmap: [prompt.md](prompt.md) and [VISUAL_BUILDER_PLAN.md](VISUAL_BUILDER_PLAN.md).
 
 ## Why
 

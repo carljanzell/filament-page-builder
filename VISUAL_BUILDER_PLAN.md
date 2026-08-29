@@ -230,6 +230,11 @@ No user-visible change. That is the point — it is a refactor with test cover, 
 
 A full-screen Filament page rendering the real blocks, with selection and drag-and-drop.
 
+> **Shipped caveat:** Stage A landed as a normal resource page
+> (`<x-filament-panels::page>` + three columns). It is not viewport-true live
+> editing. Escaping the panel, wrapping the public layout, and Interact vs Select
+> are specified in [prompt.md](prompt.md) as Stages E0–E5, *before* Stage B.
+
 Provided by the plugin as `DesignPage`, reachable at `/admin/pages/{record}/design` and added as a
 "Design" header action next to the existing editor. `EditPage` stays exactly as it is — structured
 work (SEO, slug, publish date) belongs in the form; layout work happens on the canvas.
