@@ -3,6 +3,8 @@
 A drag-and-drop visual page builder for [Filament](https://filamentphp.com), storing page
 content as an ordered array of typed blocks in a single JSON column.
 
+**📖 [Documentation](https://carljanzell.github.io/filament-page-builder/)**
+
 > **Status: Stage A complete.** The drag-and-drop canvas works — palette, reordering,
 > insert, duplicate, delete, selection and a live inspector, all persisting to the same
 > JSON the form editor uses. Stages B–D (inline text editing, layout controls, reusable

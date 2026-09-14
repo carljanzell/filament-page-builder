@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filament Page Builder — documentation</title>
+<meta name="description" content="A drag-and-drop visual page builder for Filament, storing content as ordered typed blocks in a single JSON column.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🧱</text></svg>">
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fdfdfc;
+  --bg-soft: #f5f5f3;
+  --bg-code: #f7f7f5;
+  --fg: #1c1c1a;
+  --fg-soft: #5f5f58;
+  --fg-faint: #8a8a80;
+  --rule: #e4e4df;
+  --rule-soft: #eeeee9;
+  --accent: #9a3412;
+  --accent-soft: #fdf3ee;
+  --warn: #92400e;
+  --warn-bg: #fffaf0;
+  --warn-rule: #f0d9b5;
+  --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --measure: 46rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14140f;
+    --bg-soft: #1c1c17;
+    --bg-code: #1b1b16;
+    --fg: #eceae2;
+    --fg-soft: #a9a69a;
+    --fg-faint: #7c7a70;
+    --rule: #2e2e26;
+    --rule-soft: #26261f;
+    --accent: #f0956a;
+    --accent-soft: #241811;
+    --warn: #e8b478;
+    --warn-bg: #221a10;
+    --warn-rule: #4a3720;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.65 var(--sans);
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Shell ─────────────────────────────────────────── */
+.shell { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 0; max-width: 82rem; margin: 0 auto; }
+.side {
+  position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+  padding: 2.5rem 1.5rem 3rem 2rem; border-right: 1px solid var(--rule);
+}
+.main { padding: 2.5rem 2rem 8rem; min-width: 0; overflow-x: clip; }
+.wrap { max-width: var(--measure); min-width: 0; }
+@media (max-width: 900px) {
+  .shell { display: block; }
+  .side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--rule); padding: 1.75rem 1.25rem; }
+  .main { padding: 2rem 1.25rem 5rem; }
+}
+
+/* ── Sidebar ───────────────────────────────────────── */
+.brand { font-weight: 620; letter-spacing: -0.015em; font-size: 0.95rem; margin: 0 0 0.15rem; }
+.brand a { color: var(--fg); text-decoration: none; }
+.brand-sub { font-size: 0.78rem; color: var(--fg-faint); margin: 0 0 1.75rem; font-variant-numeric: tabular-nums; }
+.nav { font-size: 0.86rem; }
+.nav ol { list-style: none; margin: 0 0 1.35rem; padding: 0; }
+.nav .grp { font-size: 0.69rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--fg-faint); font-weight: 600; margin: 0 0 0.5rem; }
+.nav a { display: block; padding: 0.19rem 0; color: var(--fg-soft); text-decoration: none; border-left: 2px solid transparent; padding-left: 0.7rem; margin-left: -0.7rem; }
+.nav a:hover { color: var(--accent); }
+.nav a.on { color: var(--fg); font-weight: 550; border-left-color: var(--accent); }
+
+/* ── Type ──────────────────────────────────────────── */
+h1 { font-size: 2rem; line-height: 1.15; letter-spacing: -0.028em; font-weight: 660; margin: 0 0 0.6rem; }
+h2 {
+  font-size: 1.3rem; letter-spacing: -0.018em; font-weight: 620; margin: 3.5rem 0 0.9rem;
+  padding-top: 1.6rem; border-top: 1px solid var(--rule-soft);
+}
+h2:first-of-type { border-top: 0; padding-top: 0; }
+h3 { font-size: 1rem; font-weight: 620; margin: 2.1rem 0 0.55rem; letter-spacing: -0.008em; }
+h4 { font-size: 0.88rem; font-weight: 640; margin: 1.5rem 0 0.4rem; color: var(--fg-soft); }
+p { margin: 0 0 1rem; }
+.lede { font-size: 1.08rem; color: var(--fg-soft); margin-bottom: 1.5rem; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+ul, ol.list { margin: 0 0 1rem; padding-left: 1.25rem; }
+li { margin: 0.28rem 0; }
+strong { font-weight: 620; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 3rem 0; }
+.anchor { color: var(--fg-faint); text-decoration: none; font-weight: 400; opacity: 0; margin-left: 0.4rem; }
+h2:hover .anchor, h3:hover .anchor { opacity: 1; }
+
+/* ── Code ──────────────────────────────────────────── */
+code { font-family: var(--mono); font-size: 0.855em; }
+:not(pre) > code {
+  background: var(--bg-code); border: 1px solid var(--rule-soft);
+  padding: 0.08em 0.34em; border-radius: 4px; overflow-wrap: anywhere;
+}
+pre {
+  background: var(--bg-code); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 0.95rem 1.1rem; overflow-x: auto; margin: 0 0 1.15rem;
+  font-size: 0.83rem; line-height: 1.62; tab-size: 4;
+}
+pre code { font-size: inherit; background: none; border: 0; padding: 0; white-space: pre; }
+.filename {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--fg-faint);
+  margin: 0 0 0.35rem; letter-spacing: 0.01em;
+}
+
+/* ── Tables ────────────────────────────────────────── */
+.tw { overflow-x: auto; margin: 0 0 1.3rem; }
+table { border-collapse: collapse; width: 100%; font-size: 0.87rem; }
+th, td { text-align: left; padding: 0.5rem 0.85rem 0.5rem 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+th { font-weight: 620; font-size: 0.73rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-faint); border-bottom-color: var(--rule); }
+td code { white-space: nowrap; }
+
+/* ── Callouts ──────────────────────────────────────── */
+.note, .warn {
+  border: 1px solid var(--rule); border-left-width: 3px; border-radius: 0 6px 6px 0;
+  padding: 0.85rem 1.1rem; margin: 0 0 1.3rem; font-size: 0.91rem; background: var(--bg-soft);
+}
+.note { border-left-color: var(--accent); }
+.warn { border-left-color: var(--warn); background: var(--warn-bg); border-color: var(--warn-rule); }
+.note > :last-child, .warn > :last-child { margin-bottom: 0; }
+.note-t, .warn-t { font-weight: 640; font-size: 0.79rem; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.3rem; }
+.note-t { color: var(--accent); }
+.warn-t { color: var(--warn); }
+
+/* ── Bits ──────────────────────────────────────────── */
+.pill {
+  display: inline-block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; padding: 0.14rem 0.5rem; border-radius: 20px;
+  background: var(--accent-soft); color: var(--accent); border: 1px solid var(--rule);
+  vertical-align: 0.12em;
+}
+.meta { font-size: 0.82rem; color: var(--fg-faint); margin: 0 0 2.5rem; }
+.meta a { color: var(--fg-soft); }
+footer { margin-top: 4.5rem; padding-top: 1.5rem; border-top: 1px solid var(--rule); font-size: 0.82rem; color: var(--fg-faint); }
+.tick { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav class="side">
+  <p class="brand"><a href="#top">Filament Page&nbsp;Builder</a></p>
+  <p class="brand-sub">carljanzell/filament-page-builder</p>
+
+  <div class="nav">
+    <p class="grp">Start</p>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#how-it-fits">How it fits together</a></li>
+      <li><a href="#install">Installation</a></li>
+    </ol>
+
+    <p class="grp">Building</p>
+    <ol>
+      <li><a href="#data">The stored shape</a></li>
+      <li><a href="#blocks">Defining a block</a></li>
+      <li><a href="#register">Registering blocks</a></li>
+      <li><a href="#canvas">Adding the canvas</a></li>
+      <li><a href="#form">The form editor</a></li>
+      <li><a href="#render">Rendering publicly</a></li>
+    </ol>
+
+    <p class="grp">Detail</p>
+    <ol>
+      <li><a href="#authorisation">Authorisation</a></li>
+      <li><a href="#state">State normalisation</a></li>
+      <li><a href="#styling">Styling the canvas</a></li>
+      <li><a href="#assets">Assets &amp; no bundler</a></li>
+    </ol>
+
+    <p class="grp">Reference</p>
+    <ol>
+      <li><a href="#api">API reference</a></li>
+      <li><a href="#limitations">Known limitations</a></li>
+      <li><a href="#licence">Licence</a></li>
+    </ol>
+  </div>
+</nav>
+
+<main class="main" id="top">
+<div class="wrap">
+
+<h1>Filament Page Builder</h1>
+<p class="lede">A drag-and-drop visual page builder for <a href="https://filamentphp.com">Filament</a>,
+storing page content as an ordered array of typed blocks in a single JSON column.</p>
+<p class="meta">
+  <span class="pill">Filament 5.x</span> <span class="pill">PHP 8.3+</span> <span class="pill">No build step</span><br>
+  <a href="https://github.com/carljanzell/filament-page-builder">Source on GitHub</a> · Proprietary, see <a href="#licence">Licence</a>
+</p>
+
+<h2 id="overview">Overview <a class="anchor" href="#overview">#</a></h2>
+
+<p>Filament&rsquo;s <code>Builder</code> field is an excellent structured editor, but it is a <em>form</em>:
+a vertical stack of collapsible panels. You cannot drop a block where you want it on the page, and you
+cannot see the layout you are actually building.</p>
+
+<p>This package adds a canvas <em>alongside</em> that form. Both surfaces read and write the same JSON,
+so neither owns the content — an editor can start a page in the form, arrange it on the canvas, and go
+back again. If you later decide the canvas was a mistake, removing it costs you nothing.</p>
+
+<h3>What the canvas does today</h3>
+<ul>
+  <li>A palette of your registered block types, on the left</li>
+  <li>Drag from the palette onto the page, at the position you want</li>
+  <li>Drag rendered blocks to reorder them</li>
+  <li>Click a block to select it; edit it in an inspector on the right, using that block&rsquo;s own Filament schema</li>
+  <li>Duplicate and delete</li>
+  <li>Blocks render with your real Blade components and your real CSS, not a stand-in</li>
+  <li>Everything is held in memory and written on an explicit <strong>Save</strong>, so a drag never waits on the server</li>
+</ul>
+
+<h3>What it deliberately does not do</h3>
+<p>No free positioning, no arbitrary nesting, no columns inside columns, no theme or global-style editing.
+A constrained palette that always produces on-brand output is the point. Free positioning mostly gives
+editors new ways to break your design.</p>
+
+<div class="note">
+  <span class="note-t">Design principles</span>
+  <p><strong>The package owns the mechanism; your application owns the content.</strong> Blocks are classes
+  in <em>your</em> app, free to query your models and render your markup. The package ships no model and no
+  migration.</p>
+  <p><strong>One registry, one set of components.</strong> The form, the canvas and your public renderer all
+  resolve through the same registry, so a block cannot mean different things in each.</p>
+  <p><strong>No bundler.</strong> The canvas JavaScript is hand-written and shipped unminified. If a feature
+  needs a build step, it is out of scope — this was written for hosts with no Node installed.</p>
+  <p style="margin-bottom:0"><strong>Unknown block types are skipped, not fatal.</strong> Content outlives
+  schema changes.</p>
+</div>
+
+<h2 id="how-it-fits">How it fits together <a class="anchor" href="#how-it-fits">#</a></h2>
+
+<p>Three things you write, four things the package provides.</p>
+
+<div class="tw">
+<table>
+<thead><tr><th>Piece</th><th>Whose</th><th>What it is</th></tr></thead>
+<tbody>
+<tr><td>Block classes</td><td>Yours</td><td>One class per block type, implementing <code>PageBlock</code></td></tr>
+<tr><td>Blade components</td><td>Yours</td><td>One per block type — your markup, your CSS</td></tr>
+<tr><td>The model &amp; migration</td><td>Yours</td><td>Any model with a JSON column cast to <code>array</code></td></tr>
+<tr><td><code>BlockRegistry</code></td><td>Package</td><td>The single source of truth for which types exist</td></tr>
+<tr><td><code>DesignPage</code></td><td>Package</td><td>The canvas, as an abstract Filament resource page</td></tr>
+<tr><td><code>BlockStateNormaliser</code></td><td>Package</td><td>Reconciles Filament form state with the stored shape</td></tr>
+<tr><td>Canvas JS &amp; CSS</td><td>Package</td><td>Registered under the package&rsquo;s own asset namespace</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Everything specific to <em>your</em> site stays on your side of that line. The package never learns your
+table name, your permission system, or your brand.</p>
+
+<h2 id="install">Installation <a class="anchor" href="#install">#</a></h2>
+
+<h4>Requirements</h4>
+<ul>
+  <li>PHP 8.3 or newer</li>
+  <li>Filament 5.x (tested against 5.8)</li>
+  <li>No Node, npm or build step — at any point</li>
+</ul>
+
+<p class="filename">composer.json</p>
+<pre><code>"repositories": [
+    { "type": "vcs", "url": "https://github.com/carljanzell/filament-page-builder.git" }
+]</code></pre>
+
+<pre><code>composer require carljanzell/filament-page-builder</code></pre>
+
+<p>The service provider is auto-discovered. Publish the canvas assets — your deploy almost certainly
+runs this already:</p>
+
+<pre><code>php artisan filament:assets</code></pre>
+
+<h3>The model</h3>
+<p>Point the builder at any model with a JSON column cast to <code>array</code>. There is no base class to
+extend and no migration to run.</p>
+
+<p class="filename">app/Models/Page.php</p>
+<pre><code>class Page extends Model
+{
+    protected function casts(): array
+    {
+        return ['blocks' =&gt; 'array'];
+    }
+}</code></pre>
+
+<div class="warn">
+  <span class="warn-t">Column name is fixed</span>
+  <p style="margin-bottom:0">The plugin exposes a <code>blocksAttribute()</code> setting, but the canvas does
+  not currently read it — it always reads and writes an attribute literally named <code>blocks</code>. Until
+  that is fixed, name your column <code>blocks</code>. See <a href="#limitations">Known limitations</a>.</p>
+</div>
+
+<h2 id="data">The stored shape <a class="anchor" href="#data">#</a></h2>
+
+<p>One JSON column holds an ordered array. Every entry has exactly three keys:</p>
+
+<pre><code>[
+  {
+    "id": "0193f2a1-8c4e-7bd1-9a20-3f5e1c7a44b0",
+    "type": "hero",
+    "data": { "heading": "Welcome", "image": "pages/banner.jpg" }
+  },
+  {
+    "id": "0193f2a1-8c4e-7bd1-9a20-3f5e1c7a44b1",
+    "type": "rich_text",
+    "data": { "body": "&lt;p&gt;Stored as HTML.&lt;/p&gt;" }
+  }
+]</code></pre>
+
+<div class="tw">
+<table>
+<thead><tr><th>Key</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>id</code></td><td>Stable identity, so reordering does not change what a block <em>is</em>. Minted automatically the first time a record is opened on the canvas, then persisted. You never set it.</td></tr>
+<tr><td><code>type</code></td><td>The machine name from your block&rsquo;s <code>type()</code>. Never change one once content exists.</td></tr>
+<tr><td><code>data</code></td><td>Whatever that block&rsquo;s Filament schema produces, in its <em>stored</em> shape — rich text as an HTML string, uploads as a plain path.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="warn">
+  <span class="warn-t">Extra keys are not preserved</span>
+  <p style="margin-bottom:0">The canvas rebuilds every block as exactly <code>id</code>, <code>type</code>,
+  <code>data</code> when it loads. Any other key you add is dropped on the next save.</p>
+</div>
+
+<h2 id="blocks">Defining a block <a class="anchor" href="#blocks">#</a></h2>
+
+<p>A block is a class implementing <code>PageBlock</code>. Everything is static: the registry needs to
+describe a block type without instantiating one.</p>
+
+<p class="filename">app/PageBlocks/HeroBlock.php</p>
+<pre><code>&lt;?php
+
+namespace App\PageBlocks;
+
+use CarlJanzell\FilamentPageBuilder\Contracts\PageBlock;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\TextInput;
+
+class HeroBlock implements PageBlock
+{
+    public static function type(): string { return 'hero'; }
+
+    public static function label(): string { return 'Hero'; }
+
+    public static function icon(): ?string { return 'heroicon-o-photo'; }
+
+    public static function view(): string { return 'blocks.hero'; }
+
+    public static function fileFields(): array { return ['image']; }
+
+    public static function isVisible(): bool { return true; }
+
+    public static function schema(): array
+    {
+        return [
+            TextInput::make('heading')
+                -&gt;required()
+                -&gt;live(onBlur: true),
+
+            FileUpload::make('image')
+                -&gt;image()
+                -&gt;disk('public')
+                -&gt;directory('pages'),
+        ];
+    }
+}</code></pre>
+
+<div class="tw">
+<table>
+<thead><tr><th>Method</th><th>Returns</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>type()</code></td><td><code>string</code></td><td>Machine name written into the JSON. Permanent.</td></tr>
+<tr><td><code>label()</code></td><td><code>string</code></td><td>Shown in the palette and on each block&rsquo;s header bar.</td></tr>
+<tr><td><code>icon()</code></td><td><code>?string</code></td><td>A Heroicon name, or <code>null</code>.</td></tr>
+<tr><td><code>schema()</code></td><td><code>array</code></td><td>Filament components. Used by <em>both</em> the inspector and the form editor.</td></tr>
+<tr><td><code>view()</code></td><td><code>string</code></td><td>Blade component name, e.g. <code>blocks.hero</code>.</td></tr>
+<tr><td><code>fileFields()</code></td><td><code>array</code></td><td>Field names holding uploads. See below.</td></tr>
+<tr><td><code>isVisible()</code></td><td><code>bool</code></td><td>Whether the current user may author this type.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Why <code>fileFields()</code> is explicit</h3>
+<p>An upload is an array while it sits in form state but a plain path string once stored. To render a
+live preview the package has to reconcile the two — and it cannot infer which fields those are, because
+a map of strings is indistinguishable from a repeater item. So you declare them. Get this wrong and the
+preview shows a broken image; nothing is lost from the database.</p>
+
+<h3>The matching Blade component</h3>
+<p>Each block needs a component at the name <code>view()</code> returns. It receives one prop, <code>data</code>.
+Read every field defensively — content written under an older schema will still be in the database.</p>
+
+<p class="filename">resources/views/components/blocks/hero.blade.php</p>
+<pre><code>@props(['data' =&gt; []])
+
+&lt;section class="hero"&gt;
+    &lt;h1&gt;{{ $data['heading'] ?? '' }}&lt;/h1&gt;
+
+    @if (filled($data['image'] ?? null))
+        &lt;img src="{{ Storage::disk('public')-&gt;url($data['image']) }}" alt=""&gt;
+    @endif
+&lt;/section&gt;</code></pre>
+
+<div class="note">
+  <span class="note-t">One component, three places</span>
+  <p style="margin-bottom:0">The same component renders on your public site, in the canvas, and in the form
+  editor&rsquo;s live preview. That is what stops the surfaces from drifting apart — but it also means it must
+  survive being handed half-finished data mid-edit. Defensive <code>??</code> everywhere.</p>
+</div>
+
+<h2 id="register">Registering blocks <a class="anchor" href="#register">#</a></h2>
+
+<p>Register the plugin on a panel and hand it your block classes. Order here is the order they appear
+in the palette.</p>
+
+<p class="filename">app/Providers/Filament/AdminPanelProvider.php</p>
+<pre><code>use CarlJanzell\FilamentPageBuilder\FilamentPageBuilderPlugin;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        // …
+        -&gt;plugins([
+            FilamentPageBuilderPlugin::make()
+                -&gt;blocks([
+                    HeroBlock::class,
+                    RichTextBlock::class,
+                    CtaBlock::class,
+                    CustomHtmlBlock::class,
+                ])
+                -&gt;canvasStylesView('filament.pages.canvas-styles'),
+        ]);
+}</code></pre>
+
+<p>A class that does not implement <code>PageBlock</code> throws an <code>InvalidArgumentException</code> at
+registration, so a typo fails loudly at boot rather than quietly at render.</p>
+
+<h2 id="canvas">Adding the canvas <a class="anchor" href="#canvas">#</a></h2>
+
+<p><code>DesignPage</code> is abstract. Subclass it and bind it to your resource:</p>
+
+<p class="filename">app/Filament/Admin/Resources/Pages/Pages/DesignPage.php</p>
+<pre><code>use CarlJanzell\FilamentPageBuilder\Filament\Pages\DesignPage as BaseDesignPage;
+
+class DesignPage extends BaseDesignPage
+{
+    protected static string $resource = PageResource::class;
+}</code></pre>
+
+<p>Then register the route on the resource:</p>
+
+<pre><code>public static function getPages(): array
+{
+    return [
+        'index'  =&gt; ListPages::route('/'),
+        'create' =&gt; CreatePage::route('/create'),
+        'edit'   =&gt; EditPage::route('/{record}/edit'),
+        'design' =&gt; DesignPage::route('/{record}/design'),
+    ];
+}</code></pre>
+
+<p>And give editors a way in — a header action on the edit page is the obvious place:</p>
+
+<pre><code>Action::make('design')
+    -&gt;label('Design')
+    -&gt;icon('heroicon-o-squares-2x2')
+    -&gt;url(fn (): string =&gt; PageResource::getUrl('design', ['record' =&gt; $this-&gt;record]))</code></pre>
+
+<h3>Access control</h3>
+<p>The canvas authorises through your resource: it calls <code>YourResource::canEdit($record)</code> and
+aborts with a 403 if that is false. Whatever policy or permission layer already guards editing guards the
+canvas too — you configure nothing.</p>
+
+<h3>Saving</h3>
+<p>Mutations apply in memory and mark the page dirty; nothing is written until the editor presses
+<strong>Save layout</strong>.</p>
+
+<div class="warn">
+  <span class="warn-t">There is no unsaved-changes guard</span>
+  <p style="margin-bottom:0">Navigating away — including the &ldquo;Form editor&rdquo; link — discards unsaved
+  work silently, and there is no undo. Deleting a block asks for no confirmation. Warn your editors, or add
+  a <code>beforeunload</code> handler on your subclass&rsquo;s view.</p>
+</div>
+
+<h2 id="form">Keeping the form editor <a class="anchor" href="#form">#</a></h2>
+
+<p>The canvas is an <em>addition</em>. Structured work — slug, SEO fields, publish date — belongs in a form,
+and Filament&rsquo;s <code>Builder</code> field is still the better tool for bulk text entry. Drive that field
+from the same registry so the two surfaces cannot disagree:</p>
+
+<p class="filename">app/Filament/Admin/Resources/Pages/Schemas/PageBlocks.php</p>
+<pre><code>use CarlJanzell\FilamentPageBuilder\BlockRegistry;
+use Filament\Forms\Components\Builder\Block;
+
+class PageBlocks
+{
+    /** @return array&lt;int, Block&gt; */
+    public static function all(): array
+    {
+        return array_values(array_map(
+            fn (string $block): Block =&gt; Block::make($block::type())
+                -&gt;label($block::label())
+                -&gt;icon($block::icon())
+                -&gt;visible(fn (): bool =&gt; $block::isVisible())
+                -&gt;schema($block::schema()),
+            app(BlockRegistry::class)-&gt;all(),
+        ));
+    }
+}</code></pre>
+
+<p>Then in your form schema:</p>
+
+<pre><code>Builder::make('blocks')-&gt;blocks(PageBlocks::all())</code></pre>
+
+<p>Add a block class once and it appears in both places. That is the whole reason the registry exists.</p>
+
+<h2 id="render">Rendering on your public site <a class="anchor" href="#render">#</a></h2>
+
+<p>The package does not ship a renderer, because rendering is markup and markup is yours. It is about ten
+lines — resolve each type through the registry and dispatch:</p>
+
+<p class="filename">resources/views/components/blocks/render.blade.php</p>
+<pre><code>@props(['blocks' =&gt; []])
+
+@php
+    $registry = app(\CarlJanzell\FilamentPageBuilder\BlockRegistry::class);
+@endphp
+
+@foreach (is_array($blocks) ? $blocks : [] as $block)
+    @continue(! is_array($block))
+    @php $view = $registry-&gt;view($block['type'] ?? null); @endphp
+    @continue(! $view)
+
+    &lt;x-dynamic-component :component="$view" :data="$block['data'] ?? []" /&gt;
+@endforeach</code></pre>
+
+<p>Used from a page template:</p>
+
+<pre><code>&lt;x-blocks.render :blocks="$page-&gt;blocks" /&gt;</code></pre>
+
+<p>Note the two <code>@continue</code> guards. <code>view()</code> returns <code>null</code> for a type that is
+not registered, and skipping is deliberate: a block type you removed last year should leave a hole in one
+page, not a 500 across the site.</p>
+
+<h2 id="authorisation">Authorisation <a class="anchor" href="#authorisation">#</a></h2>
+
+<p>There are two independent layers, and it is worth being clear about which does what.</p>
+
+<h4>1. Can this user open the canvas at all?</h4>
+<p>Your resource&rsquo;s <code>canEdit()</code>. Nothing to configure.</p>
+
+<h4>2. May this user author <em>this kind of</em> block?</h4>
+<p>The block&rsquo;s own <code>isVisible()</code>. It is a callback rather than a role check so the package
+never assumes how you do permissions — <code>spatie/laravel-permission</code>, a gate, a plain column, whatever
+you like:</p>
+
+<pre><code>public static function isVisible(): bool
+{
+    return auth()-&gt;user()?-&gt;hasRole('super_admin') ?? false;
+}</code></pre>
+
+<p>When <code>isVisible()</code> is false the block type is:</p>
+<ul>
+  <li><span class="tick">✓</span> hidden from the palette</li>
+  <li><span class="tick">✓</span> refused by <code>insertBlock()</code>, even called directly over the wire</li>
+  <li><span class="tick">✓</span> refused by <code>duplicateBlock()</code></li>
+  <li><span class="tick">✓</span> withheld from the inspector — the fields are not rendered, and the block&rsquo;s
+      stored content is left untouched rather than overwritten with empty state</li>
+</ul>
+
+<p>Existing blocks of that type stay visible on the canvas, and can still be <strong>moved and deleted</strong>.
+Neither authors content, and an editor who can see a block on a page they own should be able to take it off.</p>
+
+<div class="note">
+  <span class="note-t">If a block renders unescaped output</span>
+  <p style="margin-bottom:0">A &ldquo;custom HTML&rdquo; block that renders <code>{!! $data['html'] !!}</code>
+  is a privilege in disguise: whoever can author it can put arbitrary markup and styles on your public site.
+  Gate it with <code>isVisible()</code> and treat that gate as a security boundary, not a UI tidiness feature.</p>
+</div>
+
+<h2 id="state">State normalisation <a class="anchor" href="#state">#</a></h2>
+
+<p>Two Filament fields hold a different shape while editing than the one they store, and both will break a
+renderer that assumes the stored shape:</p>
+
+<div class="tw">
+<table>
+<thead><tr><th>Field</th><th>While editing</th><th>Once stored</th></tr></thead>
+<tbody>
+<tr><td><code>RichEditor</code></td><td>A TipTap document array (<code>{"type": "doc", …}</code>)</td><td>An HTML string</td></tr>
+<tr><td><code>FileUpload</code></td><td>An array — a wrapped path, or <code>uuid =&gt; TemporaryUploadedFile</code></td><td>A plain path string</td></tr>
+</tbody>
+</table>
+</div>
+
+<p><code>BlockStateNormaliser</code> reconciles them, and the canvas applies it before rendering. Rich text is
+resolved by shape and walked recursively, so editors nested inside repeaters are handled; uploads are resolved
+by the field names your block declares in <code>fileFields()</code>. A file still mid-upload has no permanent
+path, so it is previewed from Livewire&rsquo;s temporary URL and the stored value is left alone.</p>
+
+<p>You get this for free on the canvas. You need it explicitly if you build a live preview beside the form
+editor:</p>
+
+<pre><code>use CarlJanzell\FilamentPageBuilder\Support\BlockStateNormaliser;
+
+$preview = app(BlockStateNormaliser::class)-&gt;normalise($rawFormState);</code></pre>
+
+<h2 id="styling">Styling the canvas <a class="anchor" href="#styling">#</a></h2>
+
+<p>The package styles the builder chrome — palette, toolbar, block outlines, the drop marker. It knows
+nothing about how you style blocks. Point it at a view holding your design tokens and block stylesheet, and
+it is included inside the canvas so blocks render exactly as they do publicly:</p>
+
+<pre><code>FilamentPageBuilderPlugin::make()
+    -&gt;canvasStylesView('filament.pages.canvas-styles')</code></pre>
+
+<p class="filename">resources/views/filament/pages/canvas-styles.blade.php</p>
+<pre><code>&lt;style&gt;
+    /* your design tokens and block CSS, scoped under .fpb-canvas */
+&lt;/style&gt;</code></pre>
+
+<div class="note">
+  <span class="note-t">Inline, not an iframe</span>
+  <p style="margin-bottom:0">Blocks render in the same document as the panel. An iframe would give perfect CSS
+  isolation but makes drag-and-drop across the boundary and Livewire state sync genuinely painful. The trade is
+  that panel CSS can leak into your blocks — scope your block styles under a wrapper class if that bites.</p>
+</div>
+
+<h4>Chrome classes you can override</h4>
+<p>All prefixed <code>fpb-</code>: <code>.fpb</code>, <code>.fpb-palette</code>, <code>.fpb-palette-item</code>,
+<code>.fpb-canvas</code>, <code>.fpb-block</code>, <code>.fpb-block-bar</code>, <code>.fpb-block-body</code>,
+<code>.fpb-drop-marker</code>, <code>.fpb-toolbar</code>, <code>.fpb-inspector</code>, <code>.fpb-empty</code>.
+The selected block carries <code>data-selected="true"</code>.</p>
+
+<h2 id="assets">Assets, and why there is no bundler <a class="anchor" href="#assets">#</a></h2>
+
+<p>This package was written for a production host with no Node and no npm. That constraint shaped it, and it
+is a feature: a package that makes consumers run a JS build is a worse package.</p>
+
+<ul>
+  <li>Canvas JS and CSS are hand-written and shipped unminified.</li>
+  <li>They are registered through <code>FilamentAsset::register([...], 'carljanzell/filament-page-builder')</code>,
+      namespaced to the package, so they never touch your application&rsquo;s build.</li>
+  <li>Drag-and-drop uses the browser&rsquo;s native HTML5 API. Filament bundles SortableJS but does not expose it
+      as a public global, so relying on it would mean either a build step or a private API.</li>
+  <li>Reactivity uses Alpine, which Filament already bundles.</li>
+  <li><code>php artisan filament:assets</code> publishes them; if your deploy runs <code>filament:optimize</code>
+      you are already covered.</li>
+</ul>
+
+<p>Reordering is resolved entirely in the browser and committed to Livewire in a single call per drop, so no
+drag gesture waits on a round trip.</p>
+
+<div class="note">
+  <span class="note-t">Assets load panel-wide</span>
+  <p style="margin-bottom:0">They are registered without <code>loadedOnRequest()</code>, so the canvas JS and CSS
+  are present on every page of the panel, not only the canvas. Small enough not to matter today.</p>
+</div>
+
+<h2 id="api">API reference <a class="anchor" href="#api">#</a></h2>
+
+<h3><code>FilamentPageBuilderPlugin</code></h3>
+<div class="tw">
+<table>
+<thead><tr><th>Method</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>blocks(array $classes)</code></td><td>Block classes to register. Palette order follows this array.</td></tr>
+<tr><td><code>canvasStylesView(?string $view)</code></td><td>A Blade view included inside the canvas, before the blocks.</td></tr>
+<tr><td><code>recordModel(string $model)</code></td><td>Stored, but nothing reads it yet. <a href="#limitations">See limitations</a>.</td></tr>
+<tr><td><code>blocksAttribute(string $attr)</code></td><td>Stored, but nothing reads it yet. <a href="#limitations">See limitations</a>.</td></tr>
+<tr><td><code>FilamentPageBuilderPlugin::get()</code></td><td>The registered instance, from anywhere.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3><code>BlockRegistry</code></h3>
+<p>Resolve it from the container: <code>app(BlockRegistry::class)</code>.</p>
+<div class="tw">
+<table>
+<thead><tr><th>Method</th><th>Returns</th></tr></thead>
+<tbody>
+<tr><td><code>all()</code></td><td><code>array&lt;string, class-string&gt;</code> — every registered block, keyed by type.</td></tr>
+<tr><td><code>visible()</code></td><td>Only those the current user may author.</td></tr>
+<tr><td><code>find(?string $type)</code></td><td>The class for a type, or <code>null</code>.</td></tr>
+<tr><td><code>has(?string $type)</code></td><td>Whether a type is registered. <em>Not</em> an authorisation check.</td></tr>
+<tr><td><code>isVisible(?string $type)</code></td><td>Whether the current user may author it. Use this to gate authoring.</td></tr>
+<tr><td><code>view(?string $type)</code></td><td>Blade component name, or <code>null</code> for an unknown type.</td></tr>
+<tr><td><code>fileFields(?string $type)</code></td><td>That block&rsquo;s declared upload fields, or <code>[]</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3><code>DesignPage</code></h3>
+<p>Livewire methods on the canvas, all callable from your own view overrides.</p>
+<div class="tw">
+<table>
+<thead><tr><th>Method</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>moveBlock(string $id, int $to)</code></td><td>Reorder to a target index.</td></tr>
+<tr><td><code>insertBlock(string $type, ?int $at = null)</code></td><td>Insert at an index, or append. Refused unless authorised.</td></tr>
+<tr><td><code>duplicateBlock(string $id)</code></td><td>Copy in place with a fresh id. Refused unless authorised.</td></tr>
+<tr><td><code>removeBlock(string $id)</code></td><td>Delete. No confirmation.</td></tr>
+<tr><td><code>selectBlock(?string $id)</code></td><td>Select a block and load it into the inspector.</td></tr>
+<tr><td><code>save()</code></td><td>Commit the inspector, write the column, notify.</td></tr>
+<tr><td><code>isSelectedBlockEditable()</code></td><td>Whether the inspector should show fields for the selection.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Public properties: <code>$blocks</code>, <code>$selectedId</code>, <code>$blockData</code>,
+<code>$isDirty</code>. Computed: <code>$this-&gt;renderableBlocks</code>, <code>$this-&gt;palette</code>.</p>
+
+<h3><code>HasBlocks</code> <span class="pill">optional</span></h3>
+<p>A convenience trait for your model — <code>getBlocks()</code> returns the array defensively, and
+<code>ensureBlockIds()</code> stamps ids onto a raw array. The canvas does <strong>not</strong> require it;
+it reads the attribute directly.</p>
+
+<h2 id="limitations">Known limitations <a class="anchor" href="#limitations">#</a></h2>
+
+<p>Documented rather than hidden. Each of these is real today.</p>
+
+<h4>The blocks column must be called <code>blocks</code></h4>
+<p><code>recordModel()</code> and <code>blocksAttribute()</code> are accepted and stored, but nothing reads
+them — the canvas hardcodes the attribute name. Configuring anything else silently has no effect.</p>
+
+<h4>Unregistered block types are destroyed on save</h4>
+<p>The canvas drops types it does not recognise when it loads, and <code>save()</code> writes that pruned array
+back. Opening the canvas on a record holding a retired block type and pressing Save deletes that content
+permanently. Skipping unknown types at <em>render</em> time is intentional; doing it at <em>persist</em> time is
+not. <strong>Do not rename or remove a block type while content using it exists.</strong></p>
+
+<h4>Extra keys on a block are stripped</h4>
+<p>Blocks are rebuilt as exactly <code>id</code>, <code>type</code>, <code>data</code>. Anything else you attach
+does not survive a canvas save.</p>
+
+<h4>One registry per application, not per panel</h4>
+<p>The registry is a container singleton, so two panels registering the plugin with different block sets merge
+into a single registry.</p>
+
+<h4>No undo, no unsaved-changes guard, no delete confirmation</h4>
+<p>Blocks carry stable ids partly so undo is possible later, but it is not implemented. Leaving the page
+discards unsaved work in silence.</p>
+
+<h4>Rich text is edited in the inspector, not in place</h4>
+<p>Clicking a rich-text block opens a real <code>RichEditor</code> on the right rather than letting you type on
+the page. This is deliberate: TipTap owns that HTML format, and a second, hand-rolled producer of it would
+drift from the first.</p>
+
+<h4>Not yet independently tested</h4>
+<p>The package has no test suite of its own; it is covered through its first consuming application. Treat the
+public API as stable in intent but young in practice.</p>
+
+<h2 id="licence">Licence <a class="anchor" href="#licence">#</a></h2>
+
+<div class="warn">
+  <span class="warn-t">Proprietary — not open source</span>
+  <p>Copyright &copy; 2026 Carl Janzell. All rights reserved. The source is published for reference and
+  evaluation only.</p>
+  <p style="margin-bottom:0">No licence is granted to use, copy, modify, distribute or create derivative works
+  from this software without prior written permission from the copyright holder. Reading this documentation, or
+  the repository, grants no rights. If you would like to use it, ask.</p>
+</div>
+
+<footer>
+  <p>Filament Page Builder — documentation. Source at
+  <a href="https://github.com/carljanzell/filament-page-builder">github.com/carljanzell/filament-page-builder</a>.</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script>
+// Highlight the section currently in view in the sidebar.
+(function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.nav a'));
+    var byId = {};
+    var targets = [];
+
+    links.forEach(function (link) {
+        var id = link.getAttribute('href').slice(1);
+        var el = document.getElementById(id);
+        if (!el) { return; }
+        byId[id] = link;
+        targets.push(el);
+    });
+
+    if (!targets.length || !('IntersectionObserver' in window)) { return; }
+
+    var seen = {};
+
+    var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            seen[entry.target.id] = entry.isIntersecting;
+        });
+
+        var current = null;
+        targets.forEach(function (el) {
+            if (seen[el.id] && !current) { current = el.id; }
+        });
+
+        if (!current) { return; }
+
+        links.forEach(function (link) { link.classList.remove('on'); });
+        if (byId[current]) { byId[current].classList.add('on'); }
+    }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+
+    targets.forEach(function (el) { observer.observe(el); });
+}());
+</script>
+</body>
+</html>
