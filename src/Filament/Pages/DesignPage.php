@@ -175,7 +175,7 @@ abstract class DesignPage extends Page
 
     public function insertBlock(string $type, ?int $at = null): void
     {
-        if (! $this->registry()->has($type)) {
+        if (! $this->registry()->isVisible($type)) {
             return;
         }
 
@@ -199,6 +199,10 @@ abstract class DesignPage extends Page
         $index = $this->indexOf($id);
 
         if ($index === null) {
+            return;
+        }
+
+        if (! $this->registry()->isVisible($this->blocks[$index]['type'])) {
             return;
         }
 
@@ -274,6 +278,12 @@ abstract class DesignPage extends Page
             return;
         }
 
+        // The inspector renders no fields for a block the user may not author, so the
+        // form state is empty. Committing that would erase the block's content.
+        if (! $this->registry()->isVisible($this->blocks[$index]['type'])) {
+            return;
+        }
+
         $stored = $this->blocks[$index]['data'] ?? [];
 
         try {
@@ -311,10 +321,23 @@ abstract class DesignPage extends Page
      */
     protected function selectedBlockSchema(): array
     {
-        $type = $this->selectedBlockType();
-        $block = $type === null ? null : $this->registry()->find($type);
+        if (! $this->isSelectedBlockEditable()) {
+            return [];
+        }
 
-        return $block === null ? [] : $block::schema();
+        return $this->registry()->find($this->selectedBlockType())::schema();
+    }
+
+    /**
+     * Whether the selected block is one the current user is allowed to author.
+     *
+     * A block can be present on a page and still be off limits to whoever opened it:
+     * custom markup is the usual case. The block stays visible on the canvas and can be
+     * moved or deleted, but its fields are withheld.
+     */
+    public function isSelectedBlockEditable(): bool
+    {
+        return $this->registry()->isVisible($this->selectedBlockType());
     }
 
     protected function selectedBlockType(): ?string

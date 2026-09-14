@@ -109,10 +109,15 @@
                 {{ $this->selectedId ? 'Block settings' : 'Nothing selected' }}
             </h2>
 
-            @if ($this->selectedId)
+            @if (! $this->selectedId)
+                <p class="fpb-panel-hint">Click a block on the page to edit it.</p>
+            @elseif ($this->isSelectedBlockEditable())
                 {{ $this->form }}
             @else
-                <p class="fpb-panel-hint">Click a block on the page to edit it.</p>
+                <p class="fpb-panel-hint">
+                    You do not have permission to edit this block's content. You can still
+                    move or remove it.
+                </p>
             @endif
         </aside>
     </div>

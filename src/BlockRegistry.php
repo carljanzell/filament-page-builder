@@ -66,6 +66,21 @@ class BlockRegistry
     }
 
     /**
+     * Whether the current user may author blocks of this type.
+     *
+     * Distinct from has(): a type can be registered and still be off limits. Anything
+     * that creates or edits block content has to ask this rather than has(), because
+     * hiding a block from the palette is a presentation detail and the canvas mutations
+     * are reachable directly over the wire.
+     */
+    public function isVisible(?string $type): bool
+    {
+        $block = $this->find($type);
+
+        return $block !== null && $block::isVisible();
+    }
+
+    /**
      * Blade component for a type, or null when the type is unknown.
      *
      * Unknown types are expected rather than exceptional: content outlives schema changes,
