@@ -211,3 +211,78 @@ it('commits a pending inspector edit before saving', function (): void {
 
     expect($page->fresh()->blocks[0]['data']['text'])->toBe('After');
 });
+
+/* ── Content the canvas does not own ───────────────────── */
+
+it('keeps a block whose type is no longer registered', function (): void {
+    $page = page([block('a'), block('gone', 'retired', ['text' => 'Still here'])]);
+
+    $canvas = canvas($page);
+
+    expect(ids($canvas))->toBe(['a', 'gone']);
+
+    $canvas->call('save');
+
+    expect($page->fresh()->blocks[1])
+        ->toMatchArray(['id' => 'gone', 'type' => 'retired', 'data' => ['text' => 'Still here']]);
+});
+
+it('renders a placeholder rather than the component for a retired type', function (): void {
+    canvas(page([block('gone', 'retired')]))
+        ->assertSee('no longer offers')
+        ->assertDontSee('blk-heading', escape: false);
+});
+
+it('offers no fields for a retired type and says why', function (): void {
+    $canvas = canvas(page([block('gone', 'retired', ['text' => 'Kept'])]))
+        ->call('selectBlock', 'gone');
+
+    expect($canvas->instance()->isSelectedBlockKnown())->toBeFalse()
+        ->and($canvas->get('blocks.0.data.text'))->toBe('Kept');
+
+    $canvas->assertSee('no longer registered')->assertSet('isDirty', false);
+});
+
+it('will not duplicate a retired block', function (): void {
+    canvas(page([block('gone', 'retired')]))
+        ->call('duplicateBlock', 'gone')
+        ->assertCount('blocks', 1);
+});
+
+it('still lets a retired block be moved and removed', function (): void {
+    $canvas = canvas(page([block('a'), block('gone', 'retired')]))
+        ->call('moveBlock', 'gone', 0);
+
+    expect(ids($canvas))->toBe(['gone', 'a']);
+
+    $canvas->call('removeBlock', 'gone');
+
+    expect(ids($canvas))->toBe(['a']);
+});
+
+it('carries application keys on a block through a save', function (): void {
+    $page = page([[
+        'id' => 'a',
+        'type' => 'heading',
+        'data' => ['text' => 'Hi'],
+        'anchor' => 'intro',
+        'created_by' => 7,
+    ]]);
+
+    canvas($page)->call('save');
+
+    expect($page->fresh()->blocks[0])
+        ->toMatchArray(['anchor' => 'intro', 'created_by' => 7]);
+});
+
+it('repairs a block whose data is not an array', function (): void {
+    $canvas = canvas(page([['id' => 'a', 'type' => 'heading', 'data' => 'broken']]));
+
+    expect($canvas->get('blocks.0.data'))->toBe([]);
+});
+
+it('drops an entry with no type at all', function (): void {
+    $canvas = canvas(page([block('a'), ['id' => 'b'], 'nonsense']));
+
+    expect(ids($canvas))->toBe(['a']);
+});

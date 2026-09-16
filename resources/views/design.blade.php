@@ -78,6 +78,7 @@
                         data-index="{{ $index }}"
                         draggable="true"
                         @if ($this->selectedId === $block['id']) data-selected="true" @endif
+                        @unless ($block['isKnown']) data-unknown="true" @endunless
                         x-on:dragstart="startMove($event, '{{ $block['id'] }}')"
                         x-on:dragend="clearDrag()"
                         wire:click="selectBlock('{{ $block['id'] }}')"
@@ -94,8 +95,14 @@
                         </div>
 
                         <div class="fpb-block-body">
-                            @if ($block['view'])
+                            @if ($block['isKnown'] && $block['view'])
                                 <x-dynamic-component :component="$block['view']" :data="$block['data']" />
+                            @elseif (! $block['isKnown'])
+                                <p class="fpb-block-retired">
+                                    This page holds a <code>{{ $block['type'] }}</code> block, which this
+                                    site no longer offers. Its content is kept and saved untouched; it
+                                    cannot be shown or edited here.
+                                </p>
                             @endif
                         </div>
                     </div>
@@ -115,6 +122,11 @@
                 <p class="fpb-panel-hint">Click a block on the page to edit it.</p>
             @elseif ($this->isSelectedBlockEditable())
                 {{ $this->form }}
+            @elseif (! $this->isSelectedBlockKnown())
+                <p class="fpb-panel-hint">
+                    This block's type is no longer registered, so there are no fields to show.
+                    Its stored content is preserved. You can still move or remove it.
+                </p>
             @else
                 <p class="fpb-panel-hint">
                     You do not have permission to edit this block's content. You can still

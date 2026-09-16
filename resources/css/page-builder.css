@@ -80,6 +80,10 @@
 
 .fpb-block-body { pointer-events: none; }
 
+.fpb-block[data-unknown="true"] { background: repeating-linear-gradient(45deg, rgba(128,128,128,0.05) 0 8px, transparent 8px 16px); }
+.fpb-block-retired { padding: 1.5rem 1rem; text-align: center; font-size: 0.8rem; opacity: 0.7; }
+.fpb-block-retired code { font-family: ui-monospace, monospace; }
+
 .fpb-drop-marker { height: 3px; background: #2563eb; margin: -1px 0; }
 
 .fpb-empty { padding: 3rem 1rem; text-align: center; opacity: 0.6; font-size: 0.9rem; }

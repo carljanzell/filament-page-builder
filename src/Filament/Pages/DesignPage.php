@@ -107,7 +107,16 @@ abstract class DesignPage extends Page
     /* ── Reading ───────────────────────────────────────── */
 
     /**
-     * Blocks with ids guaranteed and unknown types dropped.
+     * Blocks with ids guaranteed and their own keys left intact.
+     *
+     * Types the registry does not know are kept rather than dropped. The canvas cannot
+     * render or edit them, but it loads and saves the whole array, so pruning here would
+     * mean opening a page holding a retired block type and pressing Save destroyed that
+     * content. Skipping an unknown type at render time is correct; doing it at persist
+     * time is data loss.
+     *
+     * Anything the application has attached to a block beyond id/type/data is carried
+     * through untouched for the same reason.
      *
      * Deliberately not named hydrateBlocks: Livewire treats hydrate{Property} as a
      * lifecycle hook and would try to call it on every request.
@@ -122,13 +131,14 @@ abstract class DesignPage extends Page
 
         return array_values(array_map(
             fn (array $block): array => [
+                ...$block,
                 'id' => $block['id'] ?? (string) Str::uuid(),
                 'type' => $block['type'],
-                'data' => $block['data'] ?? [],
+                'data' => is_array($block['data'] ?? null) ? $block['data'] : [],
             ],
             array_filter(
                 $blocks,
-                fn (mixed $block): bool => is_array($block) && $this->registry()->has($block['type'] ?? null),
+                fn (mixed $block): bool => is_array($block) && is_string($block['type'] ?? null),
             ),
         ));
     }
@@ -140,18 +150,20 @@ abstract class DesignPage extends Page
      */
     public function getRenderableBlocksProperty(): array
     {
-        return array_map(
-            fn (array $block): array => [
+        return array_map(function (array $block): array {
+            $definition = $this->registry()->find($block['type']);
+
+            return [
                 ...$block,
                 'data' => $this->normaliser()->normaliseData(
                     $block['data'] ?? [],
                     $this->registry()->fileFields($block['type']),
                 ),
-                'view' => $this->registry()->view($block['type']),
-                'label' => $this->registry()->find($block['type'])::label(),
-            ],
-            $this->blocks,
-        );
+                'view' => $definition === null ? null : $definition::view(),
+                'label' => $definition === null ? $block['type'] : $definition::label(),
+                'isKnown' => $definition !== null,
+            ];
+        }, $this->blocks);
     }
 
     /**
@@ -355,6 +367,17 @@ abstract class DesignPage extends Page
     public function isSelectedBlockEditable(): bool
     {
         return $this->registry()->isVisible($this->selectedBlockType());
+    }
+
+    /**
+     * Whether the selected block is a type this application still registers.
+     *
+     * Distinct from editability: a retired type cannot be edited by anyone, and telling
+     * the editor they lack permission for it would be a lie.
+     */
+    public function isSelectedBlockKnown(): bool
+    {
+        return $this->selectedId === null || $this->registry()->has($this->selectedBlockType());
     }
 
     protected function selectedBlockType(): ?string
