@@ -133,3 +133,17 @@ it('describes what each kind accepts', function (): void {
         ->and(Editable::text()->multiline()->isMultiline())->toBeTrue()
         ->and(Editable::text()->placeholder('Hi')->getPlaceholder())->toBe('Hi');
 });
+
+it('keeps an empty editable field on the page while editing', function (): void {
+    PageBuilder::idle();
+
+    expect(PageBuilder::shows('text', ''))->toBeFalse()
+        ->and(PageBuilder::shows('text', 'Filled'))->toBeTrue();
+
+    PageBuilder::editing('a', 'heading');
+
+    expect(PageBuilder::shows('text', ''))->toBeTrue()
+        ->and(PageBuilder::shows('untouched', ''))->toBeFalse();
+
+    PageBuilder::idle();
+});

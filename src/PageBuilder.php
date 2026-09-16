@@ -76,6 +76,21 @@ class PageBuilder
         return implode(' ', $attributes);
     }
 
+    /**
+     * Whether a block should render an element for a field that may be empty.
+     *
+     * Most block markup hides an empty field, which on the canvas leaves nothing to click
+     * into and no way to fill it in. An editable field renders anyway while editing, so
+     * its placeholder gives the editor a target.
+     *
+     * Wrap the element in `PageBuilder::shows('heading', $heading)` rather than a bare
+     * `filled()` check and an unfilled block stays fillable.
+     */
+    public static function shows(string $field, mixed $value): bool
+    {
+        return filled($value) || static::editableFor($field) !== null;
+    }
+
     public static function editableFor(string $field): ?Editable
     {
         if (! static::isEditing()) {
