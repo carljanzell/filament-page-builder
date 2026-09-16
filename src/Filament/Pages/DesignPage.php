@@ -67,9 +67,22 @@ abstract class DesignPage extends Page
         abort_unless(static::getResource()::canEdit($this->getRecord()), 403);
     }
 
+    /**
+     * Which attribute on the record holds the blocks.
+     *
+     * A record that uses HasBlocks answers for itself, which is what lets one panel host
+     * two models that name the column differently. Anything else falls back to the
+     * panel's configuration.
+     */
     public function blocksAttribute(): string
     {
-        return 'blocks';
+        $record = $this->getRecord();
+
+        if (method_exists($record, 'blocksAttribute')) {
+            return $record->blocksAttribute();
+        }
+
+        return FilamentPageBuilderPlugin::get()->getBlocksAttribute();
     }
 
     public function canvasStylesView(): ?string

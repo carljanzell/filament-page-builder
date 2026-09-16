@@ -5,6 +5,7 @@ namespace CarlJanzell\FilamentPageBuilder;
 use CarlJanzell\FilamentPageBuilder\Contracts\PageBlock;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
+use Throwable;
 
 class FilamentPageBuilderPlugin implements Plugin
 {
@@ -91,6 +92,22 @@ class FilamentPageBuilderPlugin implements Plugin
     public function getCanvasStylesView(): ?string
     {
         return $this->canvasStylesView;
+    }
+
+    /**
+     * The configured attribute, resolvable from outside a panel.
+     *
+     * Models carrying blocks are read on the public site too, where no panel is current
+     * and `filament()` would throw. Falling back to the default keeps a page rendering
+     * rather than failing on a lookup it only needed for a name.
+     */
+    public static function configuredBlocksAttribute(string $default = 'blocks'): string
+    {
+        try {
+            return static::get()->getBlocksAttribute();
+        } catch (Throwable) {
+            return $default;
+        }
     }
 
     public function getRecordModel(): ?string

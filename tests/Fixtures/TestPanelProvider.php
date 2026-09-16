@@ -6,6 +6,7 @@ use CarlJanzell\FilamentPageBuilder\FilamentPageBuilderPlugin;
 use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Blocks\BannerBlock;
 use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Blocks\HeadingBlock;
 use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Blocks\RestrictedBlock;
+use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Filament\LayoutPageResource;
 use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Filament\PageResource;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -20,6 +21,7 @@ class TestPanelProvider extends PanelProvider
             ->path('testing')
             ->resources([
                 PageResource::class,
+                LayoutPageResource::class,
             ])
             ->plugin(
                 FilamentPageBuilderPlugin::make()

@@ -2,6 +2,7 @@
 
 namespace CarlJanzell\FilamentPageBuilder\Concerns;
 
+use CarlJanzell\FilamentPageBuilder\FilamentPageBuilderPlugin;
 use Illuminate\Support\Str;
 
 /**
@@ -42,8 +43,19 @@ trait HasBlocks
         ));
     }
 
+    /**
+     * Which attribute holds the ordered blocks.
+     *
+     * Declare `protected string $blocksAttribute` on the model to override it; otherwise
+     * the panel's `blocksAttribute()` configuration decides, so a consuming application
+     * names the column once.
+     */
     public function blocksAttribute(): string
     {
-        return 'blocks';
+        if (property_exists($this, 'blocksAttribute')) {
+            return $this->blocksAttribute;
+        }
+
+        return FilamentPageBuilderPlugin::configuredBlocksAttribute();
     }
 }
