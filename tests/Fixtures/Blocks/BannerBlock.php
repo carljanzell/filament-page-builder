@@ -2,12 +2,24 @@
 
 namespace CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Blocks;
 
+use CarlJanzell\FilamentPageBuilder\Contracts\InlineEditable;
 use CarlJanzell\FilamentPageBuilder\Contracts\PageBlock;
+use CarlJanzell\FilamentPageBuilder\Editable;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
 
-class BannerBlock implements PageBlock
+class BannerBlock implements InlineEditable, PageBlock
 {
+    /**
+     * @return array<string, Editable>
+     */
+    public static function editables(): array
+    {
+        return [
+            'caption' => Editable::text()->multiline(),
+        ];
+    }
+
     public static function type(): string
     {
         return 'banner';

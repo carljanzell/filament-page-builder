@@ -21,6 +21,12 @@ document.addEventListener('alpine:init', () => {
             this.bind(window, 'beforeunload', (event) => this.guardUnload(event));
             this.bind(document, 'keydown', (event) => this.onKeydown(event));
 
+            // Inline editing. Delegated from the root so blocks re-rendered by Livewire
+            // are covered without rebinding anything.
+            this.bind(this.$el, 'focusin', (event) => this.onEditableFocus(event));
+            this.bind(this.$el, 'focusout', (event) => this.onEditableBlur(event));
+            this.bind(this.$el, 'keydown', (event) => this.onEditableKeydown(event), true);
+
             // Filament navigates between panel pages without a page load, so the browser's
             // own unload prompt never fires. Livewire's navigate event is the only chance
             // to stop the canvas being left with unsaved work.
@@ -32,9 +38,9 @@ document.addEventListener('alpine:init', () => {
             });
         },
 
-        bind(target, event, handler) {
-            target.addEventListener(event, handler);
-            this.teardown.push(() => target.removeEventListener(event, handler));
+        bind(target, event, handler, capture = false) {
+            target.addEventListener(event, handler, capture);
+            this.teardown.push(() => target.removeEventListener(event, handler, capture));
         },
 
         /* ── Leaving with unsaved work ──────────────────── */
@@ -164,6 +170,82 @@ document.addEventListener('alpine:init', () => {
             this.$wire.moveBlock(id, step > 0 ? to + 1 : to);
         },
 
+        /* ── Editing text on the page ───────────────────── */
+
+        /** The editable field an event happened inside, if any. */
+        editableFrom(event) {
+            const el = event.target;
+
+            return el instanceof HTMLElement ? el.closest('[data-fpb-field]') : null;
+        },
+
+        onEditableFocus(event) {
+            const el = this.editableFrom(event);
+
+            if (!el) {
+                return;
+            }
+
+            // Remember what was there, so Escape has something to go back to.
+            el.dataset.fpbOriginal = el.innerText;
+
+            // Typing in a block is a way of choosing it. The inspector is a second view
+            // of the same fields and should follow the caret.
+            if (this.$wire.selectedId !== el.dataset.fpbBlock) {
+                this.$wire.selectBlock(el.dataset.fpbBlock);
+            }
+        },
+
+        /**
+         * Commit on blur rather than on every keystroke.
+         *
+         * A round trip per character would have Livewire re-render the block under the
+         * caret. Committing once, when the caret has already left, is both cheaper and
+         * the same thing the inspector's own fields do.
+         */
+        onEditableBlur(event) {
+            const el = this.editableFrom(event);
+
+            if (!el) {
+                return;
+            }
+
+            const value = el.innerText;
+            const original = el.dataset.fpbOriginal;
+
+            delete el.dataset.fpbOriginal;
+
+            if (value === original) {
+                return;
+            }
+
+            this.$wire.setBlockField(el.dataset.fpbBlock, el.dataset.fpbField, value);
+        },
+
+        onEditableKeydown(event) {
+            const el = this.editableFrom(event);
+
+            if (!el) {
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+
+                el.innerText = el.dataset.fpbOriginal ?? '';
+                delete el.dataset.fpbOriginal;
+
+                return el.blur();
+            }
+
+            if (event.key === 'Enter' && el.dataset.fpbMultiline !== 'true') {
+                event.preventDefault();
+
+                return el.blur();
+            }
+        },
+
         remove(id, hasContent) {
             if (hasContent && !window.confirm('Delete this block? Its content goes with it.')) {
                 return;
@@ -274,4 +356,23 @@ document.addEventListener('alpine:init', () => {
             this.marker = null;
         },
     }));
+});
+
+/**
+ * Keep Livewire's morph off whatever is being typed into.
+ *
+ * A render triggered by anything else — selecting a block, an inspector field, a save —
+ * would otherwise rewrite the element under the caret with the server's copy of the same
+ * text and drop the caret to the end of it.
+ */
+document.addEventListener('livewire:init', () => {
+    window.Livewire.hook('morph.updating', ({ el, skip }) => {
+        if (
+            el instanceof HTMLElement &&
+            el.hasAttribute('data-fpb-field') &&
+            (el === document.activeElement || el.contains(document.activeElement))
+        ) {
+            skip();
+        }
+    });
 });

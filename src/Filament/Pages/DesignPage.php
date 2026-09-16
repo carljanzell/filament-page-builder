@@ -4,6 +4,7 @@ namespace CarlJanzell\FilamentPageBuilder\Filament\Pages;
 
 use CarlJanzell\FilamentPageBuilder\BlockRegistry;
 use CarlJanzell\FilamentPageBuilder\FilamentPageBuilderPlugin;
+use CarlJanzell\FilamentPageBuilder\PageBuilder;
 use CarlJanzell\FilamentPageBuilder\Support\BlockHistory;
 use CarlJanzell\FilamentPageBuilder\Support\BlockStateNormaliser;
 use Filament\Notifications\Notification;
@@ -409,6 +410,53 @@ abstract class DesignPage extends Page
 
             $this->blocks[$index]['data'] = $data;
             $this->isDirty = true;
+        }
+    }
+
+    /**
+     * Write one field of one block, from an edit made directly on the page.
+     *
+     * Everything here is checked rather than trusted. The canvas is a public Livewire
+     * surface: the field has to be one the block itself declared editable, and the value
+     * has to suit that kind. Marking an element up with `@editable` is not enough — the
+     * block's own declaration is the authority, so no amount of markup can open a field
+     * the block never offered.
+     */
+    public function setBlockField(string $id, string $field, mixed $value): void
+    {
+        $index = $this->indexOf($id);
+
+        if ($index === null) {
+            return;
+        }
+
+        $type = $this->blocks[$index]['type'];
+
+        if (! $this->registry()->isVisible($type)) {
+            return;
+        }
+
+        $editable = PageBuilder::editablesFor($type)[$field] ?? null;
+
+        if ($editable === null || ! $editable->accepts($value)) {
+            return;
+        }
+
+        if (($this->blocks[$index]['data'][$field] ?? null) === $value) {
+            return;
+        }
+
+        $this->remember();
+
+        $this->blocks[$index]['data'][$field] = $value;
+        $this->isDirty = true;
+
+        // The inspector is a second view of the same field and would otherwise keep
+        // showing what the page said before the edit.
+        if ($this->selectedId === $id) {
+            $this->blockData[$field] = $value;
+            $this->cacheSchema('form', null);
+            $this->form->fill($this->blockData);
         }
     }
 

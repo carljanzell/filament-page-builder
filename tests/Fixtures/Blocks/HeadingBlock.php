@@ -2,11 +2,23 @@
 
 namespace CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Blocks;
 
+use CarlJanzell\FilamentPageBuilder\Contracts\InlineEditable;
 use CarlJanzell\FilamentPageBuilder\Contracts\PageBlock;
+use CarlJanzell\FilamentPageBuilder\Editable;
 use Filament\Forms\Components\TextInput;
 
-class HeadingBlock implements PageBlock
+class HeadingBlock implements InlineEditable, PageBlock
 {
+    /**
+     * @return array<string, Editable>
+     */
+    public static function editables(): array
+    {
+        return [
+            'text' => Editable::text()->placeholder('Write a heading'),
+        ];
+    }
+
     public static function type(): string
     {
         return 'heading';

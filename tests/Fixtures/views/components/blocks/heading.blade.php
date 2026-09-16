@@ -1,3 +1,3 @@
 @props(['data' => []])
 
-<h2 class="blk-heading">{{ $data['text'] ?? '' }}</h2>
+<h2 class="blk-heading" @editable('text')>{{ $data['text'] ?? '' }}</h2>

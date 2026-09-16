@@ -88,6 +88,18 @@
 
 .fpb-block-body { pointer-events: none; }
 
+/* Fields a block has opened for editing in place. The body swallows pointer events so a
+   click selects the block; an editable takes them back so a click lands a caret. */
+.fpb-block-body [data-fpb-field] {
+    pointer-events: auto; cursor: text; border-radius: 0.125rem;
+    outline: 1px dashed transparent; outline-offset: 2px; transition: outline-color 0.15s;
+}
+.fpb-block-body [data-fpb-field]:hover { outline-color: rgba(37, 99, 235, 0.45); }
+.fpb-block-body [data-fpb-field]:focus { outline: 2px solid #2563eb; }
+.fpb-block-body [data-fpb-field]:empty::before {
+    content: attr(data-fpb-placeholder); opacity: 0.45; pointer-events: none;
+}
+
 .fpb-block[data-unknown="true"] { background: repeating-linear-gradient(45deg, rgba(128,128,128,0.05) 0 8px, transparent 8px 16px); }
 .fpb-block-retired { padding: 1.5rem 1rem; text-align: center; font-size: 0.8rem; opacity: 0.7; }
 .fpb-block-retired code { font-family: ui-monospace, monospace; }

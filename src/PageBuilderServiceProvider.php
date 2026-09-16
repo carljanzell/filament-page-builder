@@ -5,6 +5,7 @@ namespace CarlJanzell\FilamentPageBuilder;
 use Filament\Support\Assets\Css;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 
 class PageBuilderServiceProvider extends ServiceProvider
@@ -27,7 +28,23 @@ class PageBuilderServiceProvider extends ServiceProvider
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'page-builder');
 
+        $this->registerDirectives();
         $this->registerAssets();
+    }
+
+    /**
+     * `@editable('heading')` inside a block's own markup.
+     *
+     * It expands to editing attributes while the canvas is rendering and to nothing at
+     * all anywhere else, which is what lets one Blade component serve both the public
+     * page and the editor without a second renderer to drift from the first.
+     */
+    protected function registerDirectives(): void
+    {
+        Blade::directive(
+            'editable',
+            fn (string $expression): string => "<?php echo \CarlJanzell\FilamentPageBuilder\PageBuilder::editableAttributes({$expression}); ?>",
+        );
     }
 
     /**

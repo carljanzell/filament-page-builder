@@ -1,3 +1,5 @@
+@use('CarlJanzell\FilamentPageBuilder\PageBuilder')
+
 <x-filament-panels::page>
     <div
         class="fpb"
@@ -128,7 +130,13 @@
 
                         <div class="fpb-block-body">
                             @if ($block['isKnown'] && $block['view'])
+                                {{-- While this is set, `@editable` inside the block's own
+                                     markup expands to editing attributes. Off the canvas
+                                     it expands to nothing, so the public page ships the
+                                     same markup without them. --}}
+                                @php(PageBuilder::editing($block['id'], $block['type']))
                                 <x-dynamic-component :component="$block['view']" :data="$block['data']" />
+                                @php(PageBuilder::idle())
                             @elseif (! $block['isKnown'])
                                 <p class="fpb-block-retired">
                                     This page holds a <code>{{ $block['type'] }}</code> block, which this
