@@ -17,7 +17,7 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           coverage: none
 
       - name: Validate composer.json
@@ -31,3 +31,6 @@ jobs:
 
       - name: Check code style
         run: vendor/bin/pint --test
+
+      - name: Run tests
+        run: vendor/bin/pest --compact

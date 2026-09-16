@@ -39,14 +39,16 @@
                 </span>
 
                 <div class="fpb-toolbar-actions">
-                    <x-filament::button
-                        tag="a"
-                        href="{{ static::getResource()::getUrl('edit', ['record' => $this->getRecord()]) }}"
-                        color="gray"
-                        size="sm"
-                    >
-                        Form editor
-                    </x-filament::button>
+                    @if ($formEditorUrl = $this->formEditorUrl())
+                        <x-filament::button
+                            tag="a"
+                            href="{{ $formEditorUrl }}"
+                            color="gray"
+                            size="sm"
+                        >
+                            Form editor
+                        </x-filament::button>
+                    @endif
 
                     <x-filament::button
                         wire:click="save"

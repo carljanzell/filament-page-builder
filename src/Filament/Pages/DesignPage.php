@@ -77,6 +77,23 @@ abstract class DesignPage extends Page
         return FilamentPageBuilderPlugin::get()->getCanvasStylesView();
     }
 
+    /**
+     * The resource's form editor, when it has one.
+     *
+     * A resource is not obliged to expose an edit page — the canvas may be the only
+     * editing surface — so the toolbar link is conditional rather than assumed.
+     */
+    public function formEditorUrl(): ?string
+    {
+        $resource = static::getResource();
+
+        if (! $resource::hasPage('edit')) {
+            return null;
+        }
+
+        return $resource::getUrl('edit', ['record' => $this->getRecord()]);
+    }
+
     public function registry(): BlockRegistry
     {
         return app(BlockRegistry::class);
