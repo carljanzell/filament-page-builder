@@ -13,7 +13,14 @@ class PageBuilderServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $this->app->singleton(BlockRegistry::class);
+        $this->app->singleton(BlockRegistries::class);
+
+        // Resolving BlockRegistry keeps working and now yields whichever panel is being
+        // served, so nothing that injects it has to know panels exist.
+        $this->app->bind(
+            BlockRegistry::class,
+            fn ($app): BlockRegistry => $app->make(BlockRegistries::class)->current(),
+        );
     }
 
     public function boot(): void

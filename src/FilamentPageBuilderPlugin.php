@@ -20,6 +20,8 @@ class FilamentPageBuilderPlugin implements Plugin
 
     protected ?string $canvasStylesView = null;
 
+    protected ?string $panelId = null;
+
     public static function make(): static
     {
         return app(static::class);
@@ -120,13 +122,25 @@ class FilamentPageBuilderPlugin implements Plugin
         return $this->blocksAttribute;
     }
 
+    /**
+     * The registry for the panel this plugin instance was registered on.
+     *
+     * Before registration there is no panel to speak of, so it falls back to whichever
+     * one is current — which is what a caller outside a panel lifecycle means anyway.
+     */
     public function getRegistry(): BlockRegistry
     {
-        return app(BlockRegistry::class);
+        $registries = app(BlockRegistries::class);
+
+        return $this->panelId === null
+            ? $registries->current()
+            : $registries->for($this->panelId);
     }
 
     public function register(Panel $panel): void
     {
+        $this->panelId = $panel->getId();
+
         $this->getRegistry()->register($this->blocks);
     }
 

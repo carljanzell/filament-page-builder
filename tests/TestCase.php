@@ -5,6 +5,7 @@ namespace CarlJanzell\FilamentPageBuilder\Tests;
 use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use BladeUI\Icons\BladeIconsServiceProvider;
 use CarlJanzell\FilamentPageBuilder\PageBuilderServiceProvider;
+use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\SecondPanelProvider;
 use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\TestPanelProvider;
 use Filament\Actions\ActionsServiceProvider;
 use Filament\FilamentServiceProvider;
@@ -52,6 +53,7 @@ abstract class TestCase extends Orchestra
             LivewireServiceProvider::class,
             PageBuilderServiceProvider::class,
             TestPanelProvider::class,
+            SecondPanelProvider::class,
         ];
     }
 
