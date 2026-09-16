@@ -15,6 +15,162 @@ document.addEventListener('alpine:init', () => {
         mode: null,
         payload: null,
         marker: null,
+        teardown: [],
+
+        init() {
+            this.bind(window, 'beforeunload', (event) => this.guardUnload(event));
+            this.bind(document, 'keydown', (event) => this.onKeydown(event));
+
+            // Filament navigates between panel pages without a page load, so the browser's
+            // own unload prompt never fires. Livewire's navigate event is the only chance
+            // to stop the canvas being left with unsaved work.
+            this.bind(document, 'livewire:navigate', (event) => this.guardNavigate(event));
+
+            this.$cleanup(() => {
+                this.teardown.forEach((off) => off());
+                this.teardown = [];
+            });
+        },
+
+        bind(target, event, handler) {
+            target.addEventListener(event, handler);
+            this.teardown.push(() => target.removeEventListener(event, handler));
+        },
+
+        /* ── Leaving with unsaved work ──────────────────── */
+
+        guardUnload(event) {
+            if (!this.$wire.isDirty) {
+                return;
+            }
+
+            event.preventDefault();
+            // Browsers ignore the message and show their own, but older ones need a value.
+            event.returnValue = '';
+        },
+
+        guardNavigate(event) {
+            if (!this.$wire.isDirty) {
+                return;
+            }
+
+            if (!window.confirm('This page has unsaved changes. Leave without saving?')) {
+                event.preventDefault();
+            }
+        },
+
+        /* ── Keyboard ───────────────────────────────────── */
+
+        /**
+         * Whether the user is typing, in which case the canvas keeps its hands off.
+         *
+         * Covers the inspector's inputs and, from Stage B onwards, text being edited
+         * directly on the page.
+         */
+        isTyping(event) {
+            const el = event.target;
+
+            return (
+                el instanceof HTMLElement &&
+                (el.isContentEditable ||
+                    ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) ||
+                    el.closest('[contenteditable="true"]') !== null)
+            );
+        },
+
+        onKeydown(event) {
+            const chord = event.metaKey || event.ctrlKey;
+
+            if (chord && event.key.toLowerCase() === 's') {
+                event.preventDefault();
+
+                return this.$wire.save();
+            }
+
+            if (chord && event.key.toLowerCase() === 'z') {
+                event.preventDefault();
+
+                return event.shiftKey ? this.$wire.redo() : this.$wire.undo();
+            }
+
+            if (this.isTyping(event)) {
+                return;
+            }
+
+            const selected = this.$wire.selectedId;
+
+            if (event.key === 'Escape') {
+                return this.$wire.selectBlock(null);
+            }
+
+            if (!selected) {
+                return;
+            }
+
+            if (chord && event.key.toLowerCase() === 'd') {
+                event.preventDefault();
+
+                return this.$wire.duplicateBlock(selected);
+            }
+
+            if (event.key === 'Backspace' || event.key === 'Delete') {
+                event.preventDefault();
+
+                return this.remove(selected, this.selectedHasContent());
+            }
+
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                event.preventDefault();
+
+                const step = event.key === 'ArrowDown' ? 1 : -1;
+
+                return event.shiftKey
+                    ? this.moveSelected(selected, step)
+                    : this.selectNeighbour(selected, step);
+            }
+        },
+
+        /** Block ids in the order they appear on the canvas. */
+        order() {
+            return Array.from(this.$el.querySelectorAll('.fpb-block')).map((el) => el.dataset.id);
+        },
+
+        selectedHasContent() {
+            const el = this.$el.querySelector('.fpb-block[data-selected="true"]');
+
+            return el ? el.dataset.hasContent === 'true' : false;
+        },
+
+        selectNeighbour(id, step) {
+            const order = this.order();
+            const next = order[order.indexOf(id) + step];
+
+            if (next) {
+                this.$wire.selectBlock(next);
+            }
+        },
+
+        moveSelected(id, step) {
+            const order = this.order();
+            const from = order.indexOf(id);
+            const to = from + step;
+
+            if (to < 0 || to >= order.length) {
+                return;
+            }
+
+            // moveBlock takes the index in the array before the block is lifted out, so
+            // moving down by one has to aim one past the neighbour it swaps with.
+            this.$wire.moveBlock(id, step > 0 ? to + 1 : to);
+        },
+
+        remove(id, hasContent) {
+            if (hasContent && !window.confirm('Delete this block? Its content goes with it.')) {
+                return;
+            }
+
+            this.$wire.removeBlock(id);
+        },
 
         startMove(event, id) {
             this.mode = 'move';

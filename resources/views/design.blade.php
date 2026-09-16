@@ -4,6 +4,8 @@
         x-data="pageBuilderCanvas()"
         wire:key="fpb-{{ $this->getRecord()->getKey() }}"
     >
+        {{-- Keyboard shortcuts and the unsaved-changes guard are bound to the document,
+             so they work wherever the focus happens to be on the page. --}}
         {{-- Palette --}}
         <aside class="fpb-panel fpb-palette">
             <h2 class="fpb-panel-title">Blocks</h2>
@@ -29,6 +31,17 @@
                     </li>
                 @endforeach
             </ul>
+
+            <dl class="fpb-shortcuts">
+                <dt>&#8984;Z</dt><dd>Undo</dd>
+                <dt>&#8984;&#8679;Z</dt><dd>Redo</dd>
+                <dt>&#8984;D</dt><dd>Duplicate</dd>
+                <dt>&#8984;S</dt><dd>Save</dd>
+                <dt>&#8679;&uarr; &#8679;&darr;</dt><dd>Move block</dd>
+                <dt>&uarr; &darr;</dt><dd>Select</dd>
+                <dt>&#9003;</dt><dd>Delete</dd>
+                <dt>Esc</dt><dd>Deselect</dd>
+            </dl>
         </aside>
 
         {{-- Canvas --}}
@@ -39,6 +52,24 @@
                 </span>
 
                 <div class="fpb-toolbar-actions">
+                    <x-filament::icon-button
+                        icon="heroicon-m-arrow-uturn-left"
+                        label="Undo"
+                        color="gray"
+                        size="sm"
+                        wire:click="undo"
+                        :disabled="! $this->canUndo"
+                    />
+
+                    <x-filament::icon-button
+                        icon="heroicon-m-arrow-uturn-right"
+                        label="Redo"
+                        color="gray"
+                        size="sm"
+                        wire:click="redo"
+                        :disabled="! $this->canRedo"
+                    />
+
                     @if ($formEditorUrl = $this->formEditorUrl())
                         <x-filament::button
                             tag="a"
@@ -76,6 +107,7 @@
                         class="fpb-block"
                         data-id="{{ $block['id'] }}"
                         data-index="{{ $index }}"
+                        data-has-content="{{ $block['hasContent'] ? 'true' : 'false' }}"
                         draggable="true"
                         @if ($this->selectedId === $block['id']) data-selected="true" @endif
                         @unless ($block['isKnown']) data-unknown="true" @endunless
@@ -90,7 +122,7 @@
                                 <button type="button" title="Duplicate"
                                         wire:click.stop="duplicateBlock('{{ $block['id'] }}')">⧉</button>
                                 <button type="button" title="Delete"
-                                        wire:click.stop="removeBlock('{{ $block['id'] }}')">✕</button>
+                                        x-on:click.stop="remove('{{ $block['id'] }}', {{ $block['hasContent'] ? 'true' : 'false' }})">✕</button>
                             </span>
                         </div>
 

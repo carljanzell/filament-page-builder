@@ -4,6 +4,7 @@ namespace CarlJanzell\FilamentPageBuilder\Filament\Pages;
 
 use CarlJanzell\FilamentPageBuilder\BlockRegistry;
 use CarlJanzell\FilamentPageBuilder\FilamentPageBuilderPlugin;
+use CarlJanzell\FilamentPageBuilder\Support\BlockHistory;
 use CarlJanzell\FilamentPageBuilder\Support\BlockStateNormaliser;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
@@ -55,6 +56,8 @@ abstract class DesignPage extends Page
         $this->authorizeAccess();
 
         $this->blocks = $this->prepareBlocks($this->record->{$this->blocksAttribute()} ?? []);
+
+        $this->history()->clear();
     }
 
     public function getTitle(): string
@@ -117,6 +120,23 @@ abstract class DesignPage extends Page
         return app(BlockStateNormaliser::class);
     }
 
+    public function history(): BlockHistory
+    {
+        return new BlockHistory(session()->driver(), $this->getId());
+    }
+
+    /**
+     * Record the state a mutation is about to replace.
+     *
+     * Called by each mutation immediately before it changes anything, and only once it
+     * knows it will: recording a step that turns out to be a no-op would make the first
+     * undo appear to do nothing.
+     */
+    protected function remember(): void
+    {
+        $this->history()->push($this->blocks);
+    }
+
     /* ── Reading ───────────────────────────────────────── */
 
     /**
@@ -175,8 +195,30 @@ abstract class DesignPage extends Page
                 'view' => $definition === null ? null : $definition::view(),
                 'label' => $definition === null ? $block['type'] : $definition::label(),
                 'isKnown' => $definition !== null,
+                'hasContent' => $this->hasContent($block['data'] ?? []),
             ];
         }, $this->blocks);
+    }
+
+    /**
+     * Whether a block holds anything a user would mind losing.
+     *
+     * Drives the delete confirmation: prompting before removing a block the editor has
+     * only just dropped in and not yet filled would train them to dismiss the prompt.
+     */
+    protected function hasContent(mixed $data): bool
+    {
+        if (! is_array($data)) {
+            return filled($data);
+        }
+
+        foreach ($data as $value) {
+            if ($this->hasContent($value)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -204,6 +246,8 @@ abstract class DesignPage extends Page
             return;
         }
 
+        $this->remember();
+
         $block = $this->blocks[$from];
         array_splice($this->blocks, $from, 1);
 
@@ -220,6 +264,8 @@ abstract class DesignPage extends Page
         if (! $this->registry()->isVisible($type)) {
             return;
         }
+
+        $this->remember();
 
         $block = [
             'id' => (string) Str::uuid(),
@@ -248,6 +294,8 @@ abstract class DesignPage extends Page
             return;
         }
 
+        $this->remember();
+
         $copy = $this->blocks[$index];
         $copy['id'] = (string) Str::uuid();
 
@@ -263,6 +311,8 @@ abstract class DesignPage extends Page
         if ($index === null) {
             return;
         }
+
+        $this->remember();
 
         array_splice($this->blocks, $index, 1);
 
@@ -281,7 +331,23 @@ abstract class DesignPage extends Page
 
         $this->selectedId = $id;
 
-        $index = $id === null ? null : $this->indexOf($id);
+        $this->syncInspector();
+    }
+
+    /**
+     * Point the inspector at whatever the selected block now holds.
+     *
+     * Deliberately does not commit first. Undo replaces the block array while the
+     * inspector still holds the state that was just undone, and committing it would
+     * write that state straight back.
+     */
+    protected function syncInspector(): void
+    {
+        $index = $this->selectedId === null ? null : $this->indexOf($this->selectedId);
+
+        if ($index === null) {
+            $this->selectedId = null;
+        }
 
         $this->blockData = $index === null ? [] : ($this->blocks[$index]['data'] ?? []);
 
@@ -339,6 +405,8 @@ abstract class DesignPage extends Page
         }
 
         if ($data !== $stored) {
+            $this->remember();
+
             $this->blocks[$index]['data'] = $data;
             $this->isDirty = true;
         }
@@ -398,6 +466,44 @@ abstract class DesignPage extends Page
         $index = $this->selectedId === null ? null : $this->indexOf($this->selectedId);
 
         return $index === null ? null : $this->blocks[$index]['type'];
+    }
+
+    /* ── History ───────────────────────────────────────── */
+
+    public function undo(): void
+    {
+        $this->travel($this->history()->undo($this->blocks));
+    }
+
+    public function redo(): void
+    {
+        $this->travel($this->history()->redo($this->blocks));
+    }
+
+    public function getCanUndoProperty(): bool
+    {
+        return $this->history()->canUndo();
+    }
+
+    public function getCanRedoProperty(): bool
+    {
+        return $this->history()->canRedo();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>|null  $blocks
+     */
+    protected function travel(?array $blocks): void
+    {
+        if ($blocks === null) {
+            return;
+        }
+
+        $this->blocks = $blocks;
+        $this->isDirty = true;
+
+        // The selected block may not exist in the state we travelled to.
+        $this->syncInspector();
     }
 
     /* ── Persistence ───────────────────────────────────── */
