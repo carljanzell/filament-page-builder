@@ -166,6 +166,7 @@ footer { margin-top: 4.5rem; padding-top: 1.5rem; border-top: 1px solid var(--ru
     <ol>
       <li><a href="#data">The stored shape</a></li>
       <li><a href="#blocks">Defining a block</a></li>
+      <li><a href="#inline">Editing on the page</a></li>
       <li><a href="#register">Registering blocks</a></li>
       <li><a href="#canvas">Adding the canvas</a></li>
       <li><a href="#form">The form editor</a></li>
@@ -216,7 +217,10 @@ back again. If you later decide the canvas was a mistake, removing it costs you 
   <li>Drag from the palette onto the page, at the position you want</li>
   <li>Drag rendered blocks to reorder them</li>
   <li>Click a block to select it; edit it in an inspector on the right, using that block&rsquo;s own Filament schema</li>
-  <li>Duplicate and delete</li>
+  <li><strong>Type into the page itself</strong> — a block can open its own text fields for editing in place, and
+      the inspector follows the caret</li>
+  <li>Duplicate and delete, with a confirmation before anything holding content goes</li>
+  <li>Undo and redo, keyboard shortcuts, and a guard against leaving with unsaved work</li>
   <li>Blocks render with your real Blade components and your real CSS, not a stand-in</li>
   <li>Everything is held in memory and written on an explicit <strong>Save</strong>, so a drag never waits on the server</li>
 </ul>
@@ -233,8 +237,10 @@ editors new ways to break your design.</p>
   migration.</p>
   <p><strong>One registry, one set of components.</strong> The form, the canvas and your public renderer all
   resolve through the same registry, so a block cannot mean different things in each.</p>
-  <p><strong>No bundler.</strong> The canvas JavaScript is hand-written and shipped unminified. If a feature
-  needs a build step, it is out of scope — this was written for hosts with no Node installed.</p>
+  <p><strong>Consumers never run a bundler.</strong> The canvas JavaScript is shipped ready to serve and is
+  registered under the package&rsquo;s own namespace, so it never touches your application&rsquo;s build. This was
+  written for hosts with no Node installed. The package may ship prebuilt files of its own; you still install it
+  with Composer and nothing else.</p>
   <p style="margin-bottom:0"><strong>Unknown block types are skipped, not fatal.</strong> Content outlives
   schema changes.</p>
 </div>
@@ -421,6 +427,83 @@ Read every field defensively — content written under an older schema will stil
   editor&rsquo;s live preview. That is what stops the surfaces from drifting apart — but it also means it must
   survive being handed half-finished data mid-edit. Defensive <code>??</code> everywhere.</p>
 </div>
+
+<h2 id="inline">Editing on the page <a class="anchor" href="#inline">#</a></h2>
+
+<p>A block can open its own fields for editing directly on the canvas, so an editor clicks the heading and types
+into the heading rather than hunting for it in the panel on the right. Two things are needed, and they are
+deliberately separate.</p>
+
+<h3>1. The block declares what is editable</h3>
+
+<p>Implement <code>InlineEditable</code> alongside <code>PageBlock</code>. Existing blocks that do not are
+untouched and keep being edited in the inspector.</p>
+
+<pre><code>use CarlJanzell\FilamentPageBuilder\Contracts\InlineEditable;
+use CarlJanzell\FilamentPageBuilder\Contracts\PageBlock;
+use CarlJanzell\FilamentPageBuilder\Editable;
+
+class HeroBlock implements PageBlock, InlineEditable
+{
+    public static function editables(): array
+    {
+        return [
+            'heading' =&gt; Editable::text()-&gt;placeholder('Write a heading'),
+            'subheading' =&gt; Editable::text()-&gt;multiline(),
+        ];
+    }
+
+    // type(), label(), schema(), view() … as before
+}</code></pre>
+
+<h3>2. The markup says which element that is</h3>
+
+<p>In the block&rsquo;s own Blade component, mark the element with <code>@editable</code>:</p>
+
+<pre><code>&lt;section class="blk-hero"&gt;
+    &lt;h1 @editable('heading')&gt;{{ $data['heading'] ?? '' }}&lt;/h1&gt;
+    &lt;p @editable('subheading')&gt;{{ $data['subheading'] ?? '' }}&lt;/p&gt;
+&lt;/section&gt;</code></pre>
+
+<div class="note">
+  <span class="note-t">One component, two contexts</span>
+  <p style="margin-bottom:0">The directive expands to editing attributes while the canvas is rendering and to
+  <em>nothing at all</em> anywhere else. Your public page ships exactly the markup above, minus the attributes.
+  There is no second renderer for the editor, so there is nothing for the two to drift apart over.</p>
+</div>
+
+<h3>The declaration is the authority, not the markup</h3>
+
+<p><code>@editable('secret')</code> on a field the block never listed in <code>editables()</code> emits nothing.
+The canvas is a public Livewire surface, so <code>setBlockField()</code> independently refuses:</p>
+
+<ul>
+  <li>any field the block has not declared editable;</li>
+  <li>any value of the wrong kind for that field;</li>
+  <li>any block whose <code>isVisible()</code> says this user may not author it;</li>
+  <li>any block id that is not actually on the page.</li>
+</ul>
+
+<h3>How it behaves</h3>
+
+<div class="tw">
+<table>
+<thead><tr><th>Kind</th><th>On the canvas</th></tr></thead>
+<tbody>
+<tr><td><code>Editable::text()</code></td><td><code>contenteditable="plaintext-only"</code>. Enter commits and blurs.</td></tr>
+<tr><td><code>Editable::text()-&gt;multiline()</code></td><td>As above, but Enter inserts a line break.</td></tr>
+<tr><td><code>Editable::richText()</code></td><td>Declared, but still edited in the inspector. <a href="#limitations">See limitations</a>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Edits commit on <strong>blur</strong>, not per keystroke: a round trip per character would have Livewire
+re-render the block under the caret. Escape reverts the field, and focusing one selects its block so the
+inspector follows the caret. A morph hook keeps renders triggered by anything else off whatever is being typed
+into.</p>
+
+<p><code>placeholder()</code> is shown when the field is empty, so an unfilled block is still something you can
+click into rather than a zero-height element.</p>
 
 <h2 id="register">Registering blocks <a class="anchor" href="#register">#</a></h2>
 
@@ -680,8 +763,8 @@ drag gesture waits on a round trip.</p>
 <tbody>
 <tr><td><code>blocks(array $classes)</code></td><td>Block classes to register. Palette order follows this array.</td></tr>
 <tr><td><code>canvasStylesView(?string $view)</code></td><td>A Blade view included inside the canvas, before the blocks.</td></tr>
-<tr><td><code>recordModel(string $model)</code></td><td>Stored, but nothing reads it yet. <a href="#limitations">See limitations</a>.</td></tr>
-<tr><td><code>blocksAttribute(string $attr)</code></td><td>Stored, but nothing reads it yet. <a href="#limitations">See limitations</a>.</td></tr>
+<tr><td><code>recordModel(string $model)</code></td><td>The model whose records the builder edits.</td></tr>
+<tr><td><code>blocksAttribute(string $attr)</code></td><td>The JSON attribute holding the blocks. A record using <code>HasBlocks</code> may override it for itself.</td></tr>
 <tr><td><code>FilamentPageBuilderPlugin::get()</code></td><td>The registered instance, from anywhere.</td></tr>
 </tbody>
 </table>
@@ -730,38 +813,38 @@ it reads the attribute directly.</p>
 
 <h2 id="limitations">Known limitations <a class="anchor" href="#limitations">#</a></h2>
 
-<p>Documented rather than hidden. Each of these is real today.</p>
+<p>Documented rather than hidden. Each of these is real today. Several earlier entries — content destroyed
+on save, a hardcoded column name, one registry shared between panels, no undo, no test suite — have since been
+fixed and are gone from this list.</p>
 
-<h4>The blocks column must be called <code>blocks</code></h4>
-<p><code>recordModel()</code> and <code>blocksAttribute()</code> are accepted and stored, but nothing reads
-them — the canvas hardcodes the attribute name. Configuring anything else silently has no effect.</p>
+<h4>Nesting is not supported yet</h4>
+<p>Blocks are a flat, ordered list. There are no sections, columns or containers, so a block cannot hold other
+blocks. This is the next thing to change and it will come with a storage format change.</p>
 
-<h4>Unregistered block types are destroyed on save</h4>
-<p>The canvas drops types it does not recognise when it loads, and <code>save()</code> writes that pruned array
-back. Opening the canvas on a record holding a retired block type and pressing Save deletes that content
-permanently. Skipping unknown types at <em>render</em> time is intentional; doing it at <em>persist</em> time is
-not. <strong>Do not rename or remove a block type while content using it exists.</strong></p>
+<h4>Rich text is still edited in the inspector, not in place</h4>
+<p>Plain text fields are edited directly on the page. A <code>RichEditor</code> still opens on the right.
+TipTap owns that HTML format and a second, hand-rolled producer of it would drift from the first — the
+intended fix is to mount Filament&rsquo;s own TipTap bundle in place, not to write another one.</p>
 
-<h4>Extra keys on a block are stripped</h4>
-<p>Blocks are rebuilt as exactly <code>id</code>, <code>type</code>, <code>data</code>. Anything else you attach
-does not survive a canvas save.</p>
+<h4>Inline editing is limited to top-level string fields</h4>
+<p><code>setBlockField()</code> writes one named field on one block. Fields inside a repeater cannot be edited
+in place, and only fields the block names in <code>editables()</code> can be written at all.</p>
 
-<h4>One registry per application, not per panel</h4>
-<p>The registry is a container singleton, so two panels registering the plugin with different block sets merge
-into a single registry.</p>
+<h4>No layout or style controls</h4>
+<p>Padding, background, width and per-breakpoint visibility are whatever the block&rsquo;s own markup decides.
+There is no style inspector yet.</p>
 
-<h4>No undo, no unsaved-changes guard, no delete confirmation</h4>
-<p>Blocks carry stable ids partly so undo is possible later, but it is not implemented. Leaving the page
-discards unsaved work in silence.</p>
+<h4>No draft, no revisions</h4>
+<p>Saving writes straight to the record the public site reads. There is no draft copy to promote and no history
+to restore from — undo lives only as long as the canvas is open.</p>
 
-<h4>Rich text is edited in the inspector, not in place</h4>
-<p>Clicking a rich-text block opens a real <code>RichEditor</code> on the right rather than letting you type on
-the page. This is deliberate: TipTap owns that HTML format, and a second, hand-rolled producer of it would
-drift from the first.</p>
+<h4>Undo history is per session, not per tab</h4>
+<p>The undo stack is held in the session so it costs the Livewire payload nothing. Two canvases open in two tabs
+share one session, so opening a second discards the first&rsquo;s history.</p>
 
-<h4>Not yet independently tested</h4>
-<p>The package has no test suite of its own; it is covered through its first consuming application. Treat the
-public API as stable in intent but young in practice.</p>
+<h4>Unregistered block types cannot be edited</h4>
+<p>They are no longer destroyed — a retired type keeps its place and its content through a save, and can be moved
+or removed. But the canvas has no schema for it, so it shows a placeholder instead of the block.</p>
 
 <h2 id="licence">Licence <a class="anchor" href="#licence">#</a></h2>
 

@@ -5,10 +5,12 @@ content as an ordered array of typed blocks in a single JSON column.
 
 **📖 [Documentation](https://carljanzell.github.io/filament-page-builder/)**
 
-> **Status: Stage A complete.** The drag-and-drop canvas works — palette, reordering,
-> insert, duplicate, delete, selection and a live inspector, all persisting to the same
-> JSON the form editor uses. Stages B–D (inline text editing, layout controls, reusable
-> sections) are still to come.
+> **Status: the canvas is usable, and text is edited on the page.** Palette, drag to
+> insert and reorder, duplicate, delete, selection, a live inspector, undo/redo, keyboard
+> shortcuts, and inline editing of a block's own text fields — all persisting to the same
+> JSON the form editor uses. Still to come: nesting (sections and columns), a style
+> inspector, rich text in place, draft/publish and reusable sections. See
+> [ROADMAP.md](ROADMAP.md).
 
 ## Why
 
@@ -24,9 +26,9 @@ surfaces read and write the same JSON, so neither owns the content.
   model or a migration.
 - **One registry, one set of components.** The form, the canvas and the public renderer all
   resolve through the same registry, so a block cannot mean different things in each.
-- **No bundler.** Filament already bundles Alpine and SortableJS. Requiring consumers to run a
-  JS build would make this unusable on hosts without Node — which is precisely what it was
-  written for.
+- **Consumers never run a bundler.** The canvas assets are shipped ready to serve and
+  registered under the package's own namespace, so they never touch your application's
+  build. This was written for hosts with no Node installed.
 - **Unknown block types are skipped, not fatal.** Content outlives schema changes.
 
 ## Installation
@@ -101,6 +103,39 @@ FilamentPageBuilderPlugin::make()
     ->canvasStylesView('filament.pages.canvas-styles')
 ```
 
+## Editing on the page
+
+A block can open its own text fields for editing directly on the canvas. Declare which
+fields, then mark the matching element in your own markup:
+
+```php
+use CarlJanzell\FilamentPageBuilder\Contracts\InlineEditable;
+use CarlJanzell\FilamentPageBuilder\Editable;
+
+class HeroBlock implements PageBlock, InlineEditable
+{
+    public static function editables(): array
+    {
+        return [
+            'heading' => Editable::text()->placeholder('Write a heading'),
+            'subheading' => Editable::text()->multiline(),
+        ];
+    }
+}
+```
+
+```blade
+<h1 @editable('heading')>{{ $data['heading'] ?? '' }}</h1>
+```
+
+`@editable` expands to editing attributes while the canvas is rendering and to nothing
+anywhere else, so the public page ships the same markup without them — one component,
+two contexts.
+
+The declaration is the authority, not the markup: `@editable` on a field the block never
+listed emits nothing, and the canvas independently refuses to write an undeclared field, a
+value of the wrong kind, or a block the current user may not author.
+
 ## Defining a block
 
 ```php
@@ -127,6 +162,16 @@ class HeroBlock implements PageBlock
 
 `fileFields()` is explicit rather than inferred: an upload is an array in form state but a
 plain path once stored, and a map of strings is indistinguishable from a repeater item.
+
+## Tests
+
+```bash
+composer install
+vendor/bin/pest
+```
+
+The suite boots a real Filament panel under Testbench, with its own resource, canvas page
+and block fixtures.
 
 ## Requirements
 
