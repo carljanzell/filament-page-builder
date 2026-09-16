@@ -1,8 +1,11 @@
 # Filament Page Builder — Roadmap to full page control
 
-**Status today:** Stage A. Block-level canvas — palette, native HTML5 drag-and-drop,
-reorder/insert/duplicate/delete, selection, and a Filament form inspector on the right.
-Everything persists to one `blocks` JSON column. No build step, no test suite.
+**Status:** Stage 0 and Stage B's text editing are **done and shipped**. The canvas has a
+test suite (75 tests), no longer destroys content it does not recognise, honours its own
+configuration, gives each panel its own registry, has undo/redo with keyboard shortcuts
+and guards, and lets an editor type straight into a block's own text on the page.
+
+Next up: rich text in place, then nesting (§4).
 
 **Where we want to get to:** the editor manipulates the *page*, not a list of panels —
 click a heading and type into it, drop a text box into a column, set spacing and
@@ -58,26 +61,26 @@ poster-like section. Escape hatch without giving up the model.
 
 ---
 
-## 2. Stage 0 — foundation and debt *(do this first, it is cheap)*
+## 2. Stage 0 — foundation and debt ✅ done
 
 The documented limitations are load-bearing once inline editing multiplies the number of
 state mutations. Fix them before building on top.
 
 | # | Item | Why now |
 |---|------|---------|
-| 0.1 | **Test suite.** Pest 4 + `livewire()` tests for every `DesignPage` mutation; Pest browser tests for drag, drop and inline typing. | Stage B/C are refactors of exactly this code. Without tests they are guesswork. |
-| 0.2 | **Stop destroying unknown block types on save.** Keep unrecognised entries in place (render nothing, show a "retired block" placeholder on the canvas) instead of pruning at load and writing the pruned array back. | This is a silent data-loss bug today. |
-| 0.3 | **Honour `blocksAttribute()` and `recordModel()`.** Both are accepted and ignored; the canvas hardcodes `blocks`. | Documented as a limitation; it is a two-line fix and a lie in the API until then. |
-| 0.4 | **Preserve unknown keys on a block.** Merge rather than rebuild as exactly `id/type/data`. | Stage C adds `settings`, `parent_id`, `position` — the rebuild would eat them. |
-| 0.5 | **Per-panel registry.** Registry is a container singleton; two panels merge their block sets. Key it by panel id. | |
-| 0.6 | **Undo / redo.** A capped history stack (~50) of the blocks array in the Livewire component. Block ids are already stable, which is the hard part. | Inline editing makes accidental destruction far easier. |
-| 0.7 | **Unsaved-changes guard.** `beforeunload` + intercept Filament's `wire:navigate`. | |
-| 0.8 | **Delete confirmation** on blocks with content. | |
-| 0.9 | **Keyboard:** ⌘Z/⇧⌘Z, ⌘D duplicate, ⌘S save, Del, ↑/↓ move selection, Esc deselect. | |
+| 0.1 ✅ | **Test suite.** Pest 4 + `livewire()` tests for every `DesignPage` mutation; Pest browser tests for drag, drop and inline typing. | Stage B/C are refactors of exactly this code. Without tests they are guesswork. |
+| 0.2 ✅ | **Stop destroying unknown block types on save.** Keep unrecognised entries in place (render nothing, show a "retired block" placeholder on the canvas) instead of pruning at load and writing the pruned array back. | This is a silent data-loss bug today. |
+| 0.3 ✅ | **Honour `blocksAttribute()` and `recordModel()`.** Both are accepted and ignored; the canvas hardcodes `blocks`. | Documented as a limitation; it is a two-line fix and a lie in the API until then. |
+| 0.4 ✅ | **Preserve unknown keys on a block.** Merge rather than rebuild as exactly `id/type/data`. | Stage C adds `settings`, `parent_id`, `position` — the rebuild would eat them. |
+| 0.5 ✅ | **Per-panel registry.** Registry is a container singleton; two panels merge their block sets. Key it by panel id. | |
+| 0.6 ✅ | **Undo / redo.** A capped history stack (~50) of the blocks array in the Livewire component. Block ids are already stable, which is the hard part. | Inline editing makes accidental destruction far easier. |
+| 0.7 ✅ | **Unsaved-changes guard.** `beforeunload` + intercept Filament's `wire:navigate`. | |
+| 0.8 ✅ | **Delete confirmation** on blocks with content. | |
+| 0.9 ✅ | **Keyboard:** ⌘Z/⇧⌘Z, ⌘D duplicate, ⌘S save, Del, ↑/↓ move selection, Esc deselect. | |
 
 ---
 
-## 3. Stage B — inline editing ("full control, from texts")
+## 3. Stage B — inline editing ("full control, from texts") — text done, rich text next
 
 The core mechanism. A block declares which of its fields map to which element in its own
 markup; the canvas makes those elements editable in place and writes straight back to
@@ -239,8 +242,8 @@ correct).
 
 ## 7. Suggested sequencing
 
-1. **Stage 0** — tests, data-loss fixes, undo, guards. Small, and everything after it is safer.
-2. **Stage B** — inline text + rich text. Highest perceived value per hour; no storage change.
+1. ~~**Stage 0** — tests, data-loss fixes, undo, guards.~~ Done.
+2. **Stage B** — ~~inline text~~ done; rich text, images and links still to come. No storage change.
 3. **Stage C.1** — storage v2 upgrade, shipped alone and verified before anything depends on it.
 4. **Stage C.2–C.4** — containers, style tokens, responsive preview.
 5. **Stage D** — draft/publish and revisions before reusable sections.
