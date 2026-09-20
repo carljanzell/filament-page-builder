@@ -3,7 +3,7 @@
 **Status:** Stage 0, Stage B's text editing, and Stage C (nesting, style tokens,
 responsive preview) are **done and shipped**. The canvas is a nested layout
 editor: sections and columns, drag into a slot, a document outline, and a token style
-inspector. The suite is at 104 tests.
+inspector, on a dedicated full-screen Design page. The suite is at 105 tests.
 
 Next up: rich text in place, then Stage D (draft/publish).
 

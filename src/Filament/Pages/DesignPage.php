@@ -12,6 +12,8 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -72,6 +74,66 @@ abstract class DesignPage extends Page
     public function getTitle(): string
     {
         return 'Design: '.$this->getRecordTitle();
+    }
+
+    /**
+     * The Filament page heading stays empty so the editor chrome can own the top of
+     * the viewport. The browser tab still uses getTitle().
+     */
+    public function getHeading(): string | Htmlable | null
+    {
+        return '';
+    }
+
+    /**
+     * @return array<string>
+     */
+    public function getBreadcrumbs(): array
+    {
+        return [];
+    }
+
+    public function getMaxContentWidth(): Width | string | null
+    {
+        return Width::Screen;
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    public function getExtraBodyAttributes(): array
+    {
+        $attributes = parent::getExtraBodyAttributes();
+        $attributes['class'] = trim(($attributes['class'] ?? '').' fpb-edit-mode');
+
+        return $attributes;
+    }
+
+    /**
+     * @return array<string>
+     */
+    public function getPageClasses(): array
+    {
+        return ['fpb-page'];
+    }
+
+    /**
+     * Where "Back" goes — the resource list if it exists, otherwise the form editor.
+     */
+    public function exitUrl(): ?string
+    {
+        $resource = static::getResource();
+
+        if ($resource::hasPage('index')) {
+            return $resource::getUrl('index');
+        }
+
+        return $this->formEditorUrl();
+    }
+
+    public function exitLabel(): string
+    {
+        return 'Back to '.static::getResource()::getBreadcrumb();
     }
 
     protected function authorizeAccess(): void

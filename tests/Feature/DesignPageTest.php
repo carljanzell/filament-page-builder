@@ -4,6 +4,7 @@ use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Blocks\RestrictedBlock;
 use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Filament\PageResource;
 use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Filament\Pages\DesignPage;
 use CarlJanzell\FilamentPageBuilder\Tests\Fixtures\Page;
+use Filament\Support\Enums\Width;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -54,6 +55,27 @@ it('refuses the canvas to someone who may not edit the record', function (): voi
     PageResource::$canEdit = false;
 
     canvas(page())->assertForbidden();
+});
+
+it('opens as a full-screen editor without Filament page chrome', function (): void {
+    $page = page();
+    $canvas = canvas($page);
+    $instance = $canvas->instance();
+
+    expect($instance->getHeading())->toBe('')
+        ->and($instance->getBreadcrumbs())->toBe([])
+        ->and($instance->getMaxContentWidth())->toBe(Width::Screen)
+        ->and($instance->getExtraBodyAttributes()['class'])->toContain('fpb-edit-mode')
+        ->and($instance->getPageClasses())->toContain('fpb-page')
+        ->and($instance->exitUrl())->toBe(PageResource::getUrl('index'))
+        ->and($instance->exitLabel())->toBe('Back to '.PageResource::getBreadcrumb());
+
+    $canvas
+        ->assertSee('fpb-chrome', escape: false)
+        ->assertSee('fpb-chrome-title', escape: false)
+        ->assertSee('Back to')
+        ->assertSee('Save layout')
+        ->assertDontSeeHtml('Design: '.$page->title.'</h1>');
 });
 
 it('offers only the blocks the user may author in the palette', function (): void {

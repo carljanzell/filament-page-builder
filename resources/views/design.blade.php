@@ -4,8 +4,65 @@
         x-data="pageBuilderCanvas()"
         wire:key="fpb-{{ $this->getRecord()->getKey() }}"
     >
-        {{-- Keyboard shortcuts and the unsaved-changes guard are bound to the document,
-             so they work wherever the focus happens to be on the page. --}}
+        <header class="fpb-chrome">
+            <div class="fpb-chrome-start">
+                @if ($exitUrl = $this->exitUrl())
+                    <a href="{{ $exitUrl }}" class="fpb-back">{{ $this->exitLabel() }}</a>
+                @endif
+
+                <h1 class="fpb-chrome-title">{{ $this->getRecordTitle() }}</h1>
+
+                <span class="fpb-status" @class(['fpb-status-dirty' => $this->isDirty])>
+                    {{ $this->isDirty ? 'Unsaved changes' : 'All changes saved' }}
+                </span>
+            </div>
+
+            <div class="fpb-preview-toggle" role="group" aria-label="Preview width">
+                <button type="button" class="fpb-preview-btn" :data-active="preview === 'desktop'" x-on:click="preview = 'desktop'" title="Desktop">Desktop</button>
+                <button type="button" class="fpb-preview-btn" :data-active="preview === 'tablet'" x-on:click="preview = 'tablet'" title="Tablet">Tablet</button>
+                <button type="button" class="fpb-preview-btn" :data-active="preview === 'mobile'" x-on:click="preview = 'mobile'" title="Mobile">Mobile</button>
+            </div>
+
+            <div class="fpb-toolbar-actions">
+                <x-filament::icon-button
+                    icon="heroicon-m-arrow-uturn-left"
+                    label="Undo"
+                    color="gray"
+                    size="sm"
+                    wire:click="undo"
+                    :disabled="! $this->canUndo"
+                />
+
+                <x-filament::icon-button
+                    icon="heroicon-m-arrow-uturn-right"
+                    label="Redo"
+                    color="gray"
+                    size="sm"
+                    wire:click="redo"
+                    :disabled="! $this->canRedo"
+                />
+
+                @if ($formEditorUrl = $this->formEditorUrl())
+                    <x-filament::button
+                        tag="a"
+                        href="{{ $formEditorUrl }}"
+                        color="gray"
+                        size="sm"
+                    >
+                        Form editor
+                    </x-filament::button>
+                @endif
+
+                <x-filament::button
+                    wire:click="save"
+                    wire:loading.attr="disabled"
+                    size="sm"
+                >
+                    Save layout
+                </x-filament::button>
+            </div>
+        </header>
+
         {{-- Palette --}}
         <aside class="fpb-panel fpb-palette">
             <div class="fpb-side-tabs" role="tablist">
@@ -82,57 +139,6 @@
 
         {{-- Canvas --}}
         <main class="fpb-canvas-wrap">
-            <div class="fpb-toolbar">
-                <span class="fpb-status" @class(['fpb-status-dirty' => $this->isDirty])>
-                    {{ $this->isDirty ? 'Unsaved changes' : 'All changes saved' }}
-                </span>
-
-                <div class="fpb-preview-toggle" role="group" aria-label="Preview width">
-                    <button type="button" class="fpb-preview-btn" :data-active="preview === 'desktop'" x-on:click="preview = 'desktop'" title="Desktop">Desktop</button>
-                    <button type="button" class="fpb-preview-btn" :data-active="preview === 'tablet'" x-on:click="preview = 'tablet'" title="Tablet">Tablet</button>
-                    <button type="button" class="fpb-preview-btn" :data-active="preview === 'mobile'" x-on:click="preview = 'mobile'" title="Mobile">Mobile</button>
-                </div>
-
-                <div class="fpb-toolbar-actions">
-                    <x-filament::icon-button
-                        icon="heroicon-m-arrow-uturn-left"
-                        label="Undo"
-                        color="gray"
-                        size="sm"
-                        wire:click="undo"
-                        :disabled="! $this->canUndo"
-                    />
-
-                    <x-filament::icon-button
-                        icon="heroicon-m-arrow-uturn-right"
-                        label="Redo"
-                        color="gray"
-                        size="sm"
-                        wire:click="redo"
-                        :disabled="! $this->canRedo"
-                    />
-
-                    @if ($formEditorUrl = $this->formEditorUrl())
-                        <x-filament::button
-                            tag="a"
-                            href="{{ $formEditorUrl }}"
-                            color="gray"
-                            size="sm"
-                        >
-                            Form editor
-                        </x-filament::button>
-                    @endif
-
-                    <x-filament::button
-                        wire:click="save"
-                        wire:loading.attr="disabled"
-                        size="sm"
-                    >
-                        Save layout
-                    </x-filament::button>
-                </div>
-            </div>
-
             <div class="fpb-canvas-frame">
                 <div
                     class="fpb-canvas"

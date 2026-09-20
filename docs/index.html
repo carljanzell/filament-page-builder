@@ -214,6 +214,7 @@ back again. If you later decide the canvas was a mistake, removing it costs you 
 
 <h3>What the canvas does today</h3>
 <ul>
+  <li>A <strong>full-screen Design page</strong> &mdash; the editor owns the viewport, not a squeezed Filament content column</li>
   <li>A palette grouped by kind: Layout, Content, Design, then your own blocks</li>
   <li>Drag from the palette onto the page, <strong>or into a column</strong></li>
   <li>Drag the handle on a rendered block to reorder it, including across sections</li>
@@ -608,6 +609,11 @@ class DesignPage extends BaseDesignPage
 {
     protected static string $resource = PageResource::class;
 }</code></pre>
+
+<p>The canvas is a dedicated full-screen editor. Filament&rsquo;s sidebar, topbar and page heading
+stay behind so the page itself is the workspace &mdash; palette, canvas and inspector, with a
+slim bar for Back, preview widths and Save. The browser tab still reads
+<code>Design: {record}</code>.</p>
 
 <p>Then register the route on the resource:</p>
 

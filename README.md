@@ -79,7 +79,8 @@ class DesignPage extends BaseDesignPage
 ```
 
 Register it as a resource page and the canvas is available at
-`/admin/pages/{record}/design`:
+`/admin/pages/{record}/design` as a full-screen editor — Filament's sidebar and
+page heading stay behind so the page itself is the workspace:
 
 ```php
 public static function getPages(): array
