@@ -1,0 +1,4 @@
+{
+  "name": "Filament Page Builder",
+  "install": "bash .cursor/install.sh"
+}
