@@ -80,7 +80,7 @@ abstract class DesignPage extends Page
      * The Filament page heading stays empty so the editor chrome can own the top of
      * the viewport. The browser tab still uses getTitle().
      */
-    public function getHeading(): string | Htmlable | null
+    public function getHeading(): string|Htmlable|null
     {
         return '';
     }
@@ -93,7 +93,7 @@ abstract class DesignPage extends Page
         return [];
     }
 
-    public function getMaxContentWidth(): Width | string | null
+    public function getMaxContentWidth(): Width|string|null
     {
         return Width::Screen;
     }
