@@ -19,18 +19,145 @@ class PageBuilder
     protected static ?string $blockType = null;
 
     /**
-     * Mark the start of a block being rendered for editing.
+     * @var array<string, mixed>
      */
-    public static function editing(string $blockId, string $blockType): void
+    protected static array $blockData = [];
+
+    /**
+     * @var array<int, string>|null
+     */
+    protected static ?array $slotNames = null;
+
+    /**
+     * @var (callable(string): string)|null
+     */
+    protected static $slotRenderer = null;
+
+    /**
+     * Nested containers render children, which must not wipe the parent context.
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    protected static array $stack = [];
+
+    /**
+     * Mark the start of a block being rendered for editing.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function editing(string $blockId, string $blockType, array $data = []): void
     {
+        static::push();
         static::$blockId = $blockId;
         static::$blockType = $blockType;
+        static::$blockData = $data;
+        static::$slotNames = null;
+        static::$slotRenderer = null;
+    }
+
+    /**
+     * Render a container on the public page without turning `@editable` on.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function rendering(string $blockType, array $data = []): void
+    {
+        static::push();
+        static::$blockId = null;
+        static::$blockType = $blockType;
+        static::$blockData = $data;
+        static::$slotNames = null;
+        static::$slotRenderer = null;
+    }
+
+    /**
+     * How a container should fill its slots for this render.
+     *
+     * The block's own Blade component calls `slot()`; the canvas and the public
+     * renderer each supply a different inner HTML — drop zones on the canvas,
+     * children only on the public page. One section view, two contexts.
+     *
+     * @param  array<int, string>  $names
+     * @param  callable(string): string  $renderer
+     */
+    public static function provideSlots(array $names, callable $renderer): void
+    {
+        static::$slotNames = $names;
+        static::$slotRenderer = $renderer;
     }
 
     public static function idle(): void
     {
-        static::$blockId = null;
-        static::$blockType = null;
+        $previous = array_pop(static::$stack);
+
+        if ($previous === null) {
+            static::$blockId = null;
+            static::$blockType = null;
+            static::$blockData = [];
+            static::$slotNames = null;
+            static::$slotRenderer = null;
+
+            return;
+        }
+
+        static::$blockId = $previous['blockId'];
+        static::$blockType = $previous['blockType'];
+        static::$blockData = $previous['blockData'];
+        static::$slotNames = $previous['slotNames'];
+        static::$slotRenderer = $previous['slotRenderer'];
+    }
+
+    /**
+     * @return array{blockId: ?string, blockType: ?string, blockData: array<string, mixed>, slotNames: ?array<int, string>, slotRenderer: (callable(string): string)|null}
+     */
+    protected static function snapshot(): array
+    {
+        return [
+            'blockId' => static::$blockId,
+            'blockType' => static::$blockType,
+            'blockData' => static::$blockData,
+            'slotNames' => static::$slotNames,
+            'slotRenderer' => static::$slotRenderer,
+        ];
+    }
+
+    protected static function push(): void
+    {
+        static::$stack[] = static::snapshot();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function slotNames(): array
+    {
+        if (static::$slotNames !== null) {
+            return static::$slotNames;
+        }
+
+        return app(BlockRegistry::class)->slots(static::$blockType, static::$blockData);
+    }
+
+    /**
+     * The current contents of a named slot, or an empty drop well on the canvas.
+     */
+    public static function slot(string $name): string
+    {
+        $inner = static::$slotRenderer !== null ? (string) (static::$slotRenderer)($name) : '';
+
+        if (! static::isEditing()) {
+            return $inner;
+        }
+
+        // An empty `@foreach` still emits Blade/Livewire comment markers, which
+        // are not content — the slot should still show the drop hint.
+        $blank = trim(preg_replace('/<!--.*?-->/s', '', $inner) ?? '') === '';
+
+        $empty = $blank
+            ? '<p class="fpb-slot-empty">Drop a block here</p>'
+            : '';
+
+        return '<div class="fpb-slot" data-fpb-parent="'.e((string) static::$blockId).'" data-fpb-slot="'.e($name).'">'.$inner.$empty.'</div>';
     }
 
     public static function isEditing(): bool

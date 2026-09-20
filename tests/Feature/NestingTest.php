@@ -1,0 +1,193 @@
+<?php
+
+use CarlJanzell\FilamentPageBuilder\BlockRegistry;
+use CarlJanzell\FilamentPageBuilder\Blocks\SectionBlock;
+use CarlJanzell\FilamentPageBuilder\Blocks\TextBlock;
+use CarlJanzell\FilamentPageBuilder\FilamentPageBuilderPlugin;
+use CarlJanzell\FilamentPageBuilder\PageBuilder;
+use CarlJanzell\FilamentPageBuilder\Support\BlockTree;
+
+require_once __DIR__.'/DesignPageTest.php';
+
+beforeEach(function (): void {
+    app(BlockRegistry::class)->register([
+        SectionBlock::class,
+        TextBlock::class,
+    ]);
+});
+
+function section(string $id, int $columns = 2): array
+{
+    return [
+        'id' => $id,
+        'type' => 'section',
+        'data' => ['columns' => $columns, 'ratio' => $columns === 2 ? '1-1' : '1'],
+        'parent' => null,
+        'slot' => null,
+        'position' => 0,
+        'settings' => [],
+    ];
+}
+
+function child(string $id, string $parent, string $slot, string $type = 'text', array $data = []): array
+{
+    return [
+        'id' => $id,
+        'type' => $type,
+        'data' => $data,
+        'parent' => $parent,
+        'slot' => $slot,
+        'position' => 0,
+        'settings' => [],
+    ];
+}
+
+it('offers layout primitives when the plugin is left on its default', function (): void {
+    expect(FilamentPageBuilderPlugin::layoutBlockClasses())->toContain(SectionBlock::class)
+        ->and(SectionBlock::slots(['columns' => 3]))->toBe(['col-0', 'col-1', 'col-2']);
+});
+
+it('inserts a section with columns already opened', function (): void {
+    $canvas = canvas(page())->call('insertBlock', 'section');
+
+    expect($canvas->get('blocks.0.type'))->toBe('section')
+        ->and($canvas->get('blocks.0.data.columns'))->toBe(2);
+
+    $canvas->assertSee('Drop a block here')
+        ->assertSee('data-fpb-slot="col-0"', escape: false)
+        ->assertSee('data-fpb-slot="col-1"', escape: false);
+});
+
+it('drops a text box into a column', function (): void {
+    $canvas = canvas(page([section('s')]))
+        ->call('insertBlock', 'text', 0, 's', 'col-0');
+
+    expect($canvas->get('blocks.1.type'))->toBe('text')
+        ->and($canvas->get('blocks.1.parent'))->toBe('s')
+        ->and($canvas->get('blocks.1.slot'))->toBe('col-0');
+
+    $canvas->assertSee('data-fpb-field="body"', escape: false);
+});
+
+it('inserts into the selected section when the palette is clicked', function (): void {
+    $canvas = canvas(page([section('s')]))
+        ->call('selectBlock', 's')
+        ->call('insertBlock', 'text');
+
+    expect($canvas->get('blocks.1.parent'))->toBe('s')
+        ->and($canvas->get('blocks.1.slot'))->toBe('col-0');
+});
+
+it('inserts as the next sibling of a selected leaf', function (): void {
+    $canvas = canvas(page([
+        ['id' => 'a', 'type' => 'heading', 'data' => []],
+        ['id' => 'b', 'type' => 'heading', 'data' => []],
+    ]))
+        ->call('selectBlock', 'a')
+        ->call('insertBlock', 'banner');
+
+    expect(array_column($canvas->get('blocks'), 'type'))
+        ->toBe(['heading', 'banner', 'heading']);
+});
+
+it('moves a block between columns', function (): void {
+    $canvas = canvas(page([
+        section('s'),
+        child('t', 's', 'col-0', 'text', ['body' => 'Hi']),
+    ]))->call('moveBlock', 't', 0, 's', 'col-1');
+
+    expect($canvas->get('blocks.1.slot'))->toBe('col-1')
+        ->and($canvas->get('blocks.1.parent'))->toBe('s');
+});
+
+it('will not drop a section into one of its own columns', function (): void {
+    $canvas = canvas(page([
+        section('s'),
+        child('t', 's', 'col-0'),
+    ]))->call('moveBlock', 's', 0, 's', 'col-0');
+
+    expect($canvas->get('blocks.0.parent'))->toBeNull();
+
+    $canvas->assertSet('isDirty', false);
+});
+
+it('duplicates a section together with the blocks inside it', function (): void {
+    $canvas = canvas(page([
+        section('s'),
+        child('t', 's', 'col-0', 'text', ['body' => 'Hi']),
+    ]))->call('duplicateBlock', 's');
+
+    expect($canvas->get('blocks'))->toHaveCount(4)
+        ->and($canvas->get('blocks.2.type'))->toBe('section')
+        ->and($canvas->get('blocks.3.parent'))->toBe($canvas->get('blocks.2.id'))
+        ->and($canvas->get('blocks.3.data.body'))->toBe('Hi');
+});
+
+it('removes the children of a deleted section', function (): void {
+    $canvas = canvas(page([
+        section('s'),
+        child('t', 's', 'col-0'),
+        ['id' => 'r', 'type' => 'heading', 'data' => []],
+    ]))->call('removeBlock', 's');
+
+    expect(array_column($canvas->get('blocks'), 'id'))->toBe(['r']);
+});
+
+it('clears the selection when the selected block was inside a removed section', function (): void {
+    canvas(page([
+        section('s'),
+        child('t', 's', 'col-0'),
+    ]))
+        ->call('selectBlock', 't')
+        ->call('removeBlock', 's')
+        ->assertSet('selectedId', null);
+});
+
+it('does not treat an empty section as content worth confirming', function (): void {
+    $canvas = canvas(page())->call('insertBlock', 'section');
+
+    expect($canvas->instance()->rootBlocks[0]['hasContent'])->toBeFalse();
+});
+
+it('renders nested children only inside their section on the public page', function (): void {
+    $html = view('page-builder::components.blocks', [
+        'blocks' => [
+            section('s'),
+            child('t', 's', 'col-0', 'text', ['body' => 'Inside the column']),
+            ['id' => 'r', 'type' => 'heading', 'data' => ['text' => 'Root heading']],
+        ],
+    ])->render();
+
+    expect($html)->toContain('Inside the column')
+        ->and($html)->toContain('Root heading')
+        ->and($html)->toContain('fpb-section')
+        ->and($html)->not->toContain('data-fpb-field')
+        ->and($html)->not->toContain('Drop a block here');
+});
+
+it('does not emit editing attributes from a public nested render', function (): void {
+    PageBuilder::idle();
+
+    $html = view('page-builder::components.blocks', [
+        'blocks' => [
+            section('s'),
+            child('t', 's', 'col-0', 'text', ['body' => 'Hi']),
+        ],
+    ])->render();
+
+    expect(PageBuilder::isEditing())->toBeFalse()
+        ->and($html)->not->toContain('contenteditable');
+});
+
+it('walks the stored tree in document order after a nested save', function (): void {
+    $record = page([section('s')]);
+
+    canvas($record)->call('insertBlock', 'text', 0, 's', 'col-1')->call('save');
+
+    $stored = $record->fresh()->blocks;
+
+    expect($stored[1]['parent'])->toBe('s')
+        ->and($stored[1]['slot'])->toBe('col-1')
+        ->and(array_column(BlockTree::childrenOf(BlockTree::hydrate($stored), 's', 'col-1'), 'type'))
+        ->toBe(['text']);
+});

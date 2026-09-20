@@ -38,6 +38,7 @@ class BlockStateNormaliser
             ->values()
             ->filter(fn (mixed $block): bool => is_array($block) && isset($block['type']))
             ->map(fn (array $block): array => [
+                ...$block,
                 'id' => $block['id'] ?? null,
                 'type' => $block['type'],
                 'data' => $this->normaliseData(

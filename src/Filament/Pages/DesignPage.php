@@ -7,6 +7,7 @@ use CarlJanzell\FilamentPageBuilder\FilamentPageBuilderPlugin;
 use CarlJanzell\FilamentPageBuilder\PageBuilder;
 use CarlJanzell\FilamentPageBuilder\Support\BlockHistory;
 use CarlJanzell\FilamentPageBuilder\Support\BlockStateNormaliser;
+use CarlJanzell\FilamentPageBuilder\Support\BlockTree;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
@@ -47,6 +48,13 @@ abstract class DesignPage extends Page
      * @var array<string, mixed>
      */
     public array $blockData = [];
+
+    /**
+     * Style tokens for the selected block only.
+     *
+     * @var array<string, mixed>
+     */
+    public array $blockSettings = [];
 
     public bool $isDirty = false;
 
@@ -163,46 +171,178 @@ abstract class DesignPage extends Page
             return [];
         }
 
-        return array_values(array_map(
-            fn (array $block): array => [
-                ...$block,
-                'id' => $block['id'] ?? (string) Str::uuid(),
-                'type' => $block['type'],
-                'data' => is_array($block['data'] ?? null) ? $block['data'] : [],
-            ],
-            array_filter(
-                $blocks,
-                fn (mixed $block): bool => is_array($block) && is_string($block['type'] ?? null),
-            ),
-        ));
+        return BlockTree::hydrate($blocks);
     }
 
     /**
      * Blocks ready to render on the canvas, with editing state reconciled.
      *
+     * Flat, in document order. The canvas itself walks `rootBlocks` so nested
+     * children render inside their parent rather than as extra siblings.
+     *
      * @return array<int, array<string, mixed>>
      */
     public function getRenderableBlocksProperty(): array
     {
-        return array_map(function (array $block): array {
-            $definition = $this->registry()->find($block['type']);
+        return array_map(fn (array $block): array => $this->decorate($block, withChildren: false), $this->blocks);
+    }
+
+    /**
+     * Top-level blocks, each carrying its nested children already decorated.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getRootBlocksProperty(): array
+    {
+        return $this->decorateChildren(null);
+    }
+
+    /**
+     * Outline of the page, for the structure list.
+     *
+     * @return array<int, array{id: string, label: string, type: string, children: array<int, mixed>}>
+     */
+    public function getStructureProperty(): array
+    {
+        return $this->structureFrom($this->rootBlocks);
+    }
+
+    /**
+     * Palette items grouped the way WordPress groups its inserter.
+     *
+     * @return array<string, array{label: string, items: array<int, array{type: string, label: string, icon: ?string, category: string}>}>
+     */
+    public function getPaletteGroupsProperty(): array
+    {
+        $labels = [
+            'layout' => 'Layout',
+            'content' => 'Content',
+            'design' => 'Design',
+            'blocks' => 'Blocks',
+        ];
+
+        $groups = [];
+
+        foreach ($this->palette as $item) {
+            $key = $item['category'];
+            $groups[$key]['label'] ??= $labels[$key] ?? ucfirst($key);
+            $groups[$key]['items'][] = $item;
+        }
+
+        return $groups;
+    }
+
+    /**
+     * @return array<string, array<int|string, string>>
+     */
+    public function styleTokens(): array
+    {
+        return FilamentPageBuilderPlugin::get()->getStyleTokens();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $nodes
+     * @return array<int, array{id: string, label: string, type: string, children: array<int, mixed>}>
+     */
+    protected function structureFrom(array $nodes): array
+    {
+        return array_map(function (array $node): array {
+            $children = [];
+
+            foreach ($node['slotNames'] ?? [] as $slot) {
+                array_push($children, ...($node['children'][$slot] ?? []));
+            }
 
             return [
-                ...$block,
-                'data' => $this->normaliser()->normaliseData(
-                    $block['data'] ?? [],
-                    $this->registry()->fileFields($block['type']),
-                ),
-                'view' => $definition === null ? null : $definition::view(),
-                'label' => $definition === null ? $block['type'] : $definition::label(),
-                'isKnown' => $definition !== null,
-                'hasContent' => $this->hasContent($block['data'] ?? []),
+                'id' => $node['id'],
+                'label' => $node['label'],
+                'type' => $node['type'],
+                'children' => $this->structureFrom($children),
             ];
-        }, $this->blocks);
+        }, $nodes);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function decorateChildren(?string $parent, ?string $slot = null): array
+    {
+        return array_map(
+            fn (array $block): array => $this->decorate($block, withChildren: true),
+            BlockTree::childrenOf($this->blocks, $parent, $slot),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $block
+     * @return array<string, mixed>
+     */
+    protected function decorate(array $block, bool $withChildren): array
+    {
+        $definition = $this->registry()->find($block['type']);
+        $slotNames = $this->registry()->slots($block['type'], $block['data'] ?? []);
+
+        $decorated = [
+            ...$block,
+            'data' => $this->normaliser()->normaliseData(
+                $block['data'] ?? [],
+                $this->registry()->fileFields($block['type']),
+            ),
+            'view' => $definition === null ? null : $definition::view(),
+            'label' => $definition === null ? $block['type'] : $definition::label(),
+            'isKnown' => $definition !== null,
+            'hasContent' => $this->blockHasContent($block),
+            'isContainer' => $slotNames !== [],
+            'slotNames' => $slotNames,
+            'settings' => is_array($block['settings'] ?? null) ? $block['settings'] : [],
+        ];
+
+        if ($withChildren) {
+            $children = [];
+
+            foreach ($slotNames as $name) {
+                $children[$name] = $this->decorateChildren($block['id'], $name);
+            }
+
+            $decorated['children'] = $children;
+        }
+
+        return $decorated;
     }
 
     /**
      * Whether a block holds anything a user would mind losing.
+     *
+     * A freshly dropped section already has a column count in `data`, which is not
+     * content — only filled fields that differ from the type's defaults, or children
+     * sitting in its slots, count. Prompting on an empty section would train the
+     * editor to dismiss the confirm.
+     *
+     * @param  array<string, mixed>  $block
+     */
+    protected function blockHasContent(array $block): bool
+    {
+        if (BlockTree::childrenOf($this->blocks, $block['id'] ?? '') !== []) {
+            return true;
+        }
+
+        $defaults = $this->registry()->defaults($block['type'] ?? null);
+
+        foreach ($block['data'] ?? [] as $key => $value) {
+            if (array_key_exists($key, $defaults) && $defaults[$key] === $value) {
+                continue;
+            }
+
+            if ($this->hasContent($value)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether a value holds anything a user would mind losing.
      *
      * Drives the delete confirmation: prompting before removing a block the editor has
      * only just dropped in and not yet filled would train them to dismiss the prompt.
@@ -232,6 +372,7 @@ abstract class DesignPage extends Page
                 'type' => $block::type(),
                 'label' => $block::label(),
                 'icon' => $block::icon(),
+                'category' => $this->registry()->category($block::type()),
             ],
             $this->registry()->visible(),
         ));
@@ -239,45 +380,67 @@ abstract class DesignPage extends Page
 
     /* ── Mutations ─────────────────────────────────────── */
 
-    public function moveBlock(string $id, int $to): void
+    public function moveBlock(string $id, int $to, ?string $parent = null, ?string $slot = null): void
     {
-        $from = $this->indexOf($id);
+        $parent = $this->nullableString($parent);
+        $slot = $this->nullableString($slot);
 
-        if ($from === null) {
+        $next = BlockTree::move($this->blocks, $id, $to, $parent, $slot);
+
+        if ($next === $this->blocks) {
             return;
         }
 
         $this->remember();
-
-        $block = $this->blocks[$from];
-        array_splice($this->blocks, $from, 1);
-
-        // Removing the block first shifts everything after it down by one.
-        $to = max(0, min($to > $from ? $to - 1 : $to, count($this->blocks)));
-
-        array_splice($this->blocks, $to, 0, [$block]);
-
+        $this->blocks = $next;
         $this->isDirty = true;
     }
 
-    public function insertBlock(string $type, ?int $at = null): void
+    public function insertBlock(string $type, ?int $at = null, ?string $parent = null, ?string $slot = null): void
     {
         if (! $this->registry()->isVisible($type)) {
             return;
         }
 
-        $this->remember();
+        $parent = $this->nullableString($parent);
+        $slot = $this->nullableString($slot);
+
+        // A click on the palette with something selected inserts the way WordPress
+        // does: into the first slot of a container, or as the next sibling of a leaf.
+        // An explicit drop still wins — it passes $at / $parent / $slot itself.
+        if ($at === null && $parent === null && $this->selectedId !== null) {
+            $selected = BlockTree::find($this->blocks, $this->selectedId);
+
+            if ($selected !== null) {
+                $slots = $this->registry()->slots($selected['type'], $selected['data'] ?? []);
+
+                if ($slots !== []) {
+                    $parent = $selected['id'];
+                    $slot = $slots[0];
+                    $at = count(BlockTree::childrenOf($this->blocks, $parent, $slot));
+                } else {
+                    $parent = $this->nullableString($selected['parent'] ?? null);
+                    $slot = $this->nullableString($selected['slot'] ?? null);
+                    $at = ($selected['position'] ?? 0) + 1;
+                }
+            }
+        }
 
         $block = [
             'id' => (string) Str::uuid(),
             'type' => $type,
-            'data' => [],
+            'data' => $this->registry()->defaults($type),
+            'settings' => [],
         ];
 
-        $at = $at === null ? count($this->blocks) : max(0, min($at, count($this->blocks)));
+        $next = BlockTree::insert($this->blocks, $block, $at, $parent, $slot);
 
-        array_splice($this->blocks, $at, 0, [$block]);
+        if ($next === $this->blocks) {
+            return;
+        }
 
+        $this->remember();
+        $this->blocks = $next;
         $this->isDirty = true;
 
         $this->selectBlock($block['id']);
@@ -285,39 +448,36 @@ abstract class DesignPage extends Page
 
     public function duplicateBlock(string $id): void
     {
-        $index = $this->indexOf($id);
+        $source = BlockTree::find($this->blocks, $id);
 
-        if ($index === null) {
+        if ($source === null || ! $this->registry()->isVisible($source['type'])) {
             return;
         }
 
-        if (! $this->registry()->isVisible($this->blocks[$index]['type'])) {
+        $next = BlockTree::duplicate($this->blocks, $id);
+
+        if ($next === $this->blocks) {
             return;
         }
 
         $this->remember();
-
-        $copy = $this->blocks[$index];
-        $copy['id'] = (string) Str::uuid();
-
-        array_splice($this->blocks, $index + 1, 0, [$copy]);
-
+        $this->blocks = $next;
         $this->isDirty = true;
     }
 
     public function removeBlock(string $id): void
     {
-        $index = $this->indexOf($id);
-
-        if ($index === null) {
+        if (BlockTree::find($this->blocks, $id) === null) {
             return;
         }
 
+        $removed = [$id, ...BlockTree::descendantIds($this->blocks, $id)];
+        $next = BlockTree::remove($this->blocks, $id);
+
         $this->remember();
+        $this->blocks = $next;
 
-        array_splice($this->blocks, $index, 1);
-
-        if ($this->selectedId === $id) {
+        if (in_array($this->selectedId, $removed, true)) {
             $this->selectBlock(null);
         }
 
@@ -329,6 +489,7 @@ abstract class DesignPage extends Page
     public function selectBlock(?string $id): void
     {
         $this->commitSelectedBlock();
+        $this->commitSelectedSettings();
 
         $this->selectedId = $id;
 
@@ -351,6 +512,7 @@ abstract class DesignPage extends Page
         }
 
         $this->blockData = $index === null ? [] : ($this->blocks[$index]['data'] ?? []);
+        $this->blockSettings = $index === null ? [] : ($this->blocks[$index]['settings'] ?? []);
 
         // The schema is cached per request and built from $selectedId. Selecting a
         // different block mid-request leaves that cached schema pointing at the previous
@@ -465,6 +627,61 @@ abstract class DesignPage extends Page
         $this->commitSelectedBlock();
     }
 
+    public function updatedBlockSettings(): void
+    {
+        $this->commitSelectedSettings();
+    }
+
+    /**
+     * Write the inspector's style tab back onto the selected block.
+     *
+     * Only names that appear in the configured token set are kept, so a crafted
+     * Livewire payload cannot store `padding: 13px lime`.
+     */
+    public function commitSelectedSettings(): void
+    {
+        if ($this->selectedId === null) {
+            return;
+        }
+
+        $index = $this->indexOf($this->selectedId);
+
+        if ($index === null) {
+            return;
+        }
+
+        $clean = [];
+
+        foreach ($this->styleTokens() as $key => $options) {
+            $allowed = $this->tokenValues($options);
+            $value = $this->blockSettings[$key] ?? null;
+
+            if (is_string($value) && in_array($value, $allowed, true)) {
+                $clean[$key] = $value;
+            }
+        }
+
+        if ($clean === ($this->blocks[$index]['settings'] ?? [])) {
+            return;
+        }
+
+        $this->remember();
+        $this->blocks[$index]['settings'] = $clean;
+        $this->blockSettings = $clean;
+        $this->isDirty = true;
+    }
+
+    /**
+     * @param  array<int|string, string>  $options
+     * @return array<int, string>
+     */
+    protected function tokenValues(array $options): array
+    {
+        $values = array_is_list($options) ? $options : array_keys($options);
+
+        return array_values(array_filter($values, fn (mixed $value): bool => is_string($value) || is_int($value)));
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema
@@ -559,6 +776,7 @@ abstract class DesignPage extends Page
     public function save(): void
     {
         $this->commitSelectedBlock();
+        $this->commitSelectedSettings();
 
         /** @var Model $record */
         $record = $this->getRecord();
@@ -576,12 +794,11 @@ abstract class DesignPage extends Page
 
     protected function indexOf(string $id): ?int
     {
-        foreach ($this->blocks as $index => $block) {
-            if (($block['id'] ?? null) === $id) {
-                return $index;
-            }
-        }
+        return BlockTree::indexOf($this->blocks, $id);
+    }
 
-        return null;
+    protected function nullableString(?string $value): ?string
+    {
+        return is_string($value) && $value !== '' ? $value : null;
     }
 }

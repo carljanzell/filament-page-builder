@@ -6,8 +6,9 @@
  * and the package must not require consumers to run a JS build — the whole point is that
  * it works on hosts with no Node installed.
  *
- * Reordering is resolved here and committed to Livewire in a single call per drop, so a
- * drag gesture never waits on the server.
+ * Drop targets are slots (columns) and the root canvas. The pointer resolves to the
+ * nearest valid well, so a block can land beside its siblings or inside a section,
+ * WordPress-style. Reordering is committed to Livewire in a single call per drop.
  */
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('pageBuilderCanvas', () => ({
@@ -15,7 +16,11 @@ document.addEventListener('alpine:init', () => {
         mode: null,
         payload: null,
         marker: null,
+        target: null,
         teardown: [],
+        sideTab: 'blocks',
+        inspectorTab: 'content',
+        preview: 'desktop',
 
         init() {
             this.bind(window, 'beforeunload', (event) => this.guardUnload(event));
@@ -136,7 +141,7 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        /** Block ids in the order they appear on the canvas. */
+        /** Block ids in the order they appear on the canvas, nested children included. */
         order() {
             return Array.from(this.$el.querySelectorAll('.fpb-block')).map((el) => el.dataset.id);
         },
@@ -157,17 +162,26 @@ document.addEventListener('alpine:init', () => {
         },
 
         moveSelected(id, step) {
-            const order = this.order();
-            const from = order.indexOf(id);
-            const to = from + step;
+            const el = this.blockEl(id);
 
-            if (to < 0 || to >= order.length) {
+            if (!el) {
                 return;
             }
 
-            // moveBlock takes the index in the array before the block is lifted out, so
-            // moving down by one has to aim one past the neighbour it swaps with.
-            this.$wire.moveBlock(id, step > 0 ? to + 1 : to);
+            const siblings = this.directBlocks(this.slotOf(el) ?? this.canvas());
+            const from = siblings.indexOf(el);
+            const to = from + step;
+
+            if (from < 0 || to < 0 || to >= siblings.length) {
+                return;
+            }
+
+            const parent = el.dataset.parent || null;
+            const slot = el.dataset.slot || null;
+
+            // moveBlock takes the index in the sibling list before the block is lifted
+            // out, so moving down by one has to aim one past the neighbour it swaps with.
+            this.$wire.moveBlock(id, step > 0 ? to + 1 : to, parent, slot);
         },
 
         /* ── Editing text on the page ───────────────────── */
@@ -260,6 +274,12 @@ document.addEventListener('alpine:init', () => {
             event.dataTransfer.effectAllowed = 'move';
             // Firefox refuses to start a drag unless something is set.
             event.dataTransfer.setData('text/plain', id);
+
+            const el = this.blockEl(id);
+
+            if (el) {
+                el.dataset.dragging = 'true';
+            }
         },
 
         startInsert(event, type) {
@@ -272,26 +292,126 @@ document.addEventListener('alpine:init', () => {
         clearDrag() {
             this.mode = null;
             this.payload = null;
+            this.target = null;
             this.removeMarker();
+            this.clearSlotHighlight();
+
+            this.$el.querySelectorAll('.fpb-block[data-dragging]').forEach((el) => {
+                delete el.dataset.dragging;
+            });
         },
 
-        /** Index the dragged item would land at, from the pointer's position. */
-        targetIndex(event) {
-            const blocks = Array.from(this.$el.querySelectorAll('.fpb-block'));
+        canvas() {
+            return this.$el.querySelector('.fpb-canvas');
+        },
 
-            if (blocks.length === 0) {
-                return 0;
+        blockEl(id) {
+            return this.$el.querySelector(`.fpb-block[data-id="${this.cssEscape(id)}"]`);
+        },
+
+        cssEscape(value) {
+            return typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(value) : value.replace(/"/g, '\\"');
+        },
+
+        slotOf(el) {
+            return el.closest('.fpb-slot');
+        },
+
+        /** Direct child blocks of a slot or the root canvas — not nested descendants. */
+        directBlocks(container) {
+            if (!container) {
+                return [];
             }
 
+            return Array.from(container.children).filter((el) => el.classList?.contains('fpb-block'));
+        },
+
+        /**
+         * Whether dropping `id` into `parent` would nest a block inside itself.
+         */
+        isInvalidParent(id, parent) {
+            if (!id || !parent) {
+                return false;
+            }
+
+            if (id === parent) {
+                return true;
+            }
+
+            const parentEl = this.blockEl(parent);
+
+            return parentEl !== null && this.blockEl(id)?.contains(parentEl);
+        },
+
+        /**
+         * The slot or root canvas the pointer is over, and the sibling index it would
+         * land at. Prefers an inner column when the pointer is inside one, so dropping
+         * onto a section does not always bounce the block back to the page root.
+         */
+        targetFromEvent(event) {
+            const canvas = this.canvas();
+
+            if (!canvas) {
+                return null;
+            }
+
+            const slot = event.target instanceof Element ? event.target.closest('.fpb-slot') : null;
+            const overCanvas = event.target instanceof Element && canvas.contains(event.target);
+
+            if (!overCanvas && event.target !== canvas) {
+                // Still allow the empty-canvas drop, when the event target is the canvas itself.
+            }
+
+            let container = canvas;
+            let parent = null;
+            let slotName = null;
+
+            if (slot && canvas.contains(slot)) {
+                container = slot;
+                parent = slot.dataset.fpbParent || null;
+                slotName = slot.dataset.fpbSlot || null;
+            }
+
+            if (this.mode === 'move' && this.isInvalidParent(this.payload, parent)) {
+                return null;
+            }
+
+            const blocks = this.directBlocks(container);
+            let index = blocks.length;
+
             for (let i = 0; i < blocks.length; i++) {
+                if (this.mode === 'move' && blocks[i].dataset.id === this.payload) {
+                    continue;
+                }
+
                 const box = blocks[i].getBoundingClientRect();
 
                 if (event.clientY < box.top + box.height / 2) {
-                    return i;
+                    index = i;
+
+                    break;
                 }
             }
 
-            return blocks.length;
+            // The sibling index we send to Livewire includes the dragged block when it
+            // is already in this group, matching moveBlock's "before lift" contract.
+            if (this.mode === 'move') {
+                const dragged = blocks.find((el) => el.dataset.id === this.payload);
+
+                if (dragged) {
+                    const draggedIndex = blocks.indexOf(dragged);
+
+                    if (draggedIndex !== -1 && draggedIndex < index) {
+                        // Walking past the dragged block: the visual gap after it is
+                        // already "its current index + 1" in the before-lift list.
+                    }
+                } else {
+                    // Coming from another slot: `index` is the destination sibling list
+                    // as it stands, which is what insert/move expect for a new group.
+                }
+            }
+
+            return { parent, slot: slotName, index, container };
         },
 
         onDragOver(event) {
@@ -300,12 +420,18 @@ document.addEventListener('alpine:init', () => {
             }
 
             event.dataTransfer.dropEffect = this.mode === 'move' ? 'move' : 'copy';
-            this.showMarker(this.targetIndex(event));
+
+            const next = this.targetFromEvent(event);
+
+            this.target = next;
+            this.highlightSlot(next?.container);
+            this.showMarker(next);
         },
 
         onDragLeave(event) {
             if (!this.$el.contains(event.relatedTarget)) {
                 this.removeMarker();
+                this.clearSlotHighlight();
             }
         },
 
@@ -314,37 +440,55 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            const index = this.targetIndex(event);
+            const next = this.targetFromEvent(event) ?? this.target;
             const mode = this.mode;
             const payload = this.payload;
 
             this.clearDrag();
 
-            if (mode === 'move') {
-                this.$wire.moveBlock(payload, index);
-            } else {
-                this.$wire.insertBlock(payload, index);
-            }
-        },
-
-        showMarker(index) {
-            this.removeMarker();
-
-            const canvas = this.$el.querySelector('.fpb-canvas');
-
-            if (!canvas) {
+            if (!next) {
                 return;
             }
 
-            const blocks = Array.from(canvas.querySelectorAll('.fpb-block'));
+            if (mode === 'move') {
+                this.$wire.moveBlock(payload, next.index, next.parent, next.slot);
+            } else {
+                this.$wire.insertBlock(payload, next.index, next.parent, next.slot);
+            }
+        },
+
+        highlightSlot(container) {
+            this.clearSlotHighlight();
+
+            if (container && container.classList.contains('fpb-slot')) {
+                container.dataset.dropActive = 'true';
+            }
+        },
+
+        clearSlotHighlight() {
+            this.$el.querySelectorAll('.fpb-slot[data-drop-active]').forEach((el) => {
+                delete el.dataset.dropActive;
+            });
+        },
+
+        showMarker(target) {
+            this.removeMarker();
+
+            if (!target || !target.container) {
+                return;
+            }
+
+            const blocks = this.directBlocks(target.container);
 
             this.marker = document.createElement('div');
             this.marker.className = 'fpb-drop-marker';
 
-            if (index >= blocks.length) {
-                canvas.appendChild(this.marker);
+            const before = blocks[target.index];
+
+            if (before) {
+                target.container.insertBefore(this.marker, before);
             } else {
-                canvas.insertBefore(this.marker, blocks[index]);
+                target.container.appendChild(this.marker);
             }
         },
 
