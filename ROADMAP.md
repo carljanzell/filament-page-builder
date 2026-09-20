@@ -1,7 +1,7 @@
 # Filament Page Builder — Roadmap to full page control
 
 **Status:** Stage 0, Stage B's text editing, and Stage C (nesting, style tokens,
-responsive preview) are **done and shipped**. The canvas is a WordPress-style layout
+responsive preview) are **done and shipped**. The canvas is a nested layout
 editor: sections and columns, drag into a slot, a document outline, and a token style
 inspector. The suite is at 104 tests.
 
@@ -53,7 +53,7 @@ poster-like section. Escape hatch without giving up the model.
 
 ### Two further decisions, settled
 
-- **"Textboxes" means draggable text boxes**, WordPress-style — a text primitive you drop
+- **"Textboxes" means draggable text boxes** — a text primitive you drop
   anywhere and type into. *Not* on-page form inputs. Form submissions are out of scope;
   Stage E is the free-canvas hatch only.
 - **The no-build rule is broken**, deliberately and only inside this repo. The package may

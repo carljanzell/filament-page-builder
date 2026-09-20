@@ -208,7 +208,7 @@ abstract class DesignPage extends Page
     }
 
     /**
-     * Palette items grouped the way WordPress groups its inserter.
+     * Palette items grouped by category: Layout, Content, Design, then the rest.
      *
      * @return array<string, array{label: string, items: array<int, array{type: string, label: string, icon: ?string, category: string}>}>
      */
@@ -405,8 +405,8 @@ abstract class DesignPage extends Page
         $parent = $this->nullableString($parent);
         $slot = $this->nullableString($slot);
 
-        // A click on the palette with something selected inserts the way WordPress
-        // does: into the first slot of a container, or as the next sibling of a leaf.
+        // A click on the palette with something selected inserts into the first slot
+        // of a container, or as the next sibling of a leaf.
         // An explicit drop still wins — it passes $at / $parent / $slot itself.
         if ($at === null && $parent === null && $this->selectedId !== null) {
             $selected = BlockTree::find($this->blocks, $this->selectedId);

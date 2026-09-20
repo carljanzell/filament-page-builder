@@ -8,7 +8,7 @@ use CarlJanzell\FilamentPageBuilder\Editable;
 use Filament\Forms\Components\Textarea;
 
 /**
- * A text box you drop anywhere and type into — the WordPress "paragraph" primitive.
+ * A text box you drop anywhere and type into.
  */
 class TextBlock implements InlineEditable, PageBlock
 {

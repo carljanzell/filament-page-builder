@@ -9,7 +9,7 @@ use Filament\Forms\Components\Select;
 /**
  * A row of columns that other blocks drop into.
  *
- * This is the WordPress-style layout primitive: the page is still made of typed
+ * This is the layout primitive: the page is still made of typed
  * blocks, but a section is how an editor composes them side by side. The package
  * ships it so every consuming app has columns without writing a container themselves;
  * registering another block with type `section` replaces it.

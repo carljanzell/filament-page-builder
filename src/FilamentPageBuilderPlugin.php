@@ -114,8 +114,8 @@ class FilamentPageBuilderPlugin implements Plugin
     /**
      * Whether the package's own layout primitives appear in the palette.
      *
-     * On by default so a new panel already has sections, text boxes and spacers,
-     * WordPress-style. Registering a block with the same type() replaces the shipped
+     * On by default so a new panel already has sections, text boxes and spacers.
+     * Registering a block with the same type() replaces the shipped
      * one. Pass false to keep a palette of only the application's own types.
      */
     public function includeLayoutBlocks(bool $include = true): static

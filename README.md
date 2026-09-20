@@ -5,7 +5,7 @@ content as an ordered array of typed blocks in a single JSON column.
 
 **📖 [Documentation](https://carljanzell.github.io/filament-page-builder/)**
 
-> **Status: the canvas is a WordPress-style layout editor.** Palette with layout
+> **Status: the canvas is a nested layout editor.** Palette with layout
 > primitives, drag into columns, a document outline, token style inspector, inline text
 > editing, undo/redo and keyboard shortcuts — all persisting to the same JSON the form
 > editor uses. Still to come: rich text in place, draft/publish and reusable sections. See
@@ -93,7 +93,7 @@ public static function getPages(): array
 
 Blocks are mutated in memory and written on an explicit save, so a drag never waits on a
 database round trip. Drop a **Section** to get columns; drag text, images and your own
-blocks into a column the way Gutenberg does. Click a block and open the **Style** tab for
+blocks into a column. Click a block and open the **Style** tab for
 padding, width, background and alignment — tokens, not raw CSS.
 
 ### Making the canvas match your site

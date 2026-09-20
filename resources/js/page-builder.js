@@ -7,8 +7,8 @@
  * it works on hosts with no Node installed.
  *
  * Drop targets are slots (columns) and the root canvas. The pointer resolves to the
- * nearest valid well, so a block can land beside its siblings or inside a section,
- * WordPress-style. Reordering is committed to Livewire in a single call per drop.
+ * nearest valid well, so a block can land beside its siblings or inside a section.
+ * Reordering is committed to Livewire in a single call per drop.
  */
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('pageBuilderCanvas', () => ({

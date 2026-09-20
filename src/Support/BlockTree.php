@@ -16,7 +16,7 @@ class BlockTree
 {
     /**
      * How deep a block may sit. Deep enough for section → column → section → column →
-     * text, which is what a WordPress-style page actually uses, and shallow enough that
+     * text, which is what a typical composed page uses, and shallow enough that
      * an editor cannot bury content six containers down by accident.
      */
     public const MAX_DEPTH = 5;

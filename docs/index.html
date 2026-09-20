@@ -214,7 +214,7 @@ back again. If you later decide the canvas was a mistake, removing it costs you 
 
 <h3>What the canvas does today</h3>
 <ul>
-  <li>A palette grouped like WordPress&rsquo;s inserter: Layout, Content, Design, then your own blocks</li>
+  <li>A palette grouped by kind: Layout, Content, Design, then your own blocks</li>
   <li>Drag from the palette onto the page, <strong>or into a column</strong></li>
   <li>Drag the handle on a rendered block to reorder it, including across sections</li>
   <li>A document outline (Structure) that follows the tree</li>
@@ -231,9 +231,9 @@ back again. If you later decide the canvas was a mistake, removing it costs you 
 </ul>
 
 <h3>What it deliberately does not do</h3>
-<p>No free positioning, no pixel-level canvas. Blocks stay the unit of layout — the WordPress Gutenberg
-model, not Elementor. A constrained palette that always produces on-brand output is the point. Free
-positioning mostly gives editors new ways to break your design.</p>
+<p>No free positioning, no pixel-level canvas. Blocks stay the unit of layout — typed
+components in a tree, not a free-form artboard. A constrained palette that always produces
+on-brand output is the point. Free positioning mostly gives editors new ways to break your design.</p>
 
 <div class="note">
   <span class="note-t">Design principles</span>
@@ -443,7 +443,7 @@ Read every field defensively — content written under an older schema will stil
 
 <h2 id="layout">Sections and columns <a class="anchor" href="#layout">#</a></h2>
 
-<p>The package ships the WordPress-style layout primitives so a new panel already has something to compose
+<p>The package ships layout primitives so a new panel already has something to compose
 with. They appear in the palette automatically. Register a class with the same <code>type()</code> to
 replace one, or pass <code>includeLayoutBlocks(false)</code> to hide them all.</p>
 
