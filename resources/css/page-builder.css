@@ -156,8 +156,17 @@ html.dark .fpb {
 }
 .fpb-preview-btn[data-active="true"] { background: var(--fpb-raised-bg, #fff); opacity: 1; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
 
+/*
+ * The canvas scroller.
+ *
+ * `align-items: flex-start` is load-bearing: the frame has a definite height, so the
+ * default `stretch` pinned the canvas to that height. With `overflow: hidden` on the
+ * canvas, a page taller than the viewport was clipped rather than scrolled, and the
+ * editor had no vertical scroll at all. Starting the canvas at the top lets it take
+ * its content height, and `min-height: 100%` still fills the frame on a short page.
+ */
 .fpb-canvas-frame {
-    display: flex; justify-content: center;
+    display: flex; justify-content: center; align-items: flex-start;
     flex: 1;
     min-height: 0;
     overflow: auto;
