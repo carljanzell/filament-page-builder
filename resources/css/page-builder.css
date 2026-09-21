@@ -18,6 +18,24 @@
     background: var(--fpb-editor-bg, #f4f4f5);
 }
 
+/*
+ * The chrome follows the panel's theme.
+ *
+ * Text colour is inherited from Filament on purpose, so it is already right in either
+ * mode — but the panels hardcoded a light background, which put Filament's white dark
+ * mode text on white and made the palette, the inspector and the toolbar unreadable.
+ * Only the backgrounds need a dark value; the borders and tab strips are grey with an
+ * alpha and read on both.
+ *
+ * Declared on .fpb rather than :root so an application setting these on :root still
+ * wins in light mode, which is the extension point these variables already were.
+ */
+html.dark .fpb {
+    --fpb-editor-bg: #18181b;
+    --fpb-panel-bg: #27272a;
+    --fpb-raised-bg: #3f3f46;
+}
+
 .fpb-chrome {
     grid-column: 1 / -1;
     display: flex;
@@ -79,7 +97,7 @@
     background: transparent; font-size: 0.75rem; font-weight: 600;
     cursor: pointer; color: inherit; opacity: 0.65;
 }
-.fpb-side-tab[data-active="true"] { background: #fff; opacity: 1; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.fpb-side-tab[data-active="true"] { background: var(--fpb-raised-bg, #fff); opacity: 1; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
 
 .fpb-palette-group {
     font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
@@ -136,7 +154,7 @@
     background: transparent; font-size: 0.72rem; font-weight: 600;
     cursor: pointer; color: inherit; opacity: 0.65;
 }
-.fpb-preview-btn[data-active="true"] { background: #fff; opacity: 1; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.fpb-preview-btn[data-active="true"] { background: var(--fpb-raised-bg, #fff); opacity: 1; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
 
 .fpb-canvas-frame {
     display: flex; justify-content: center;
@@ -152,7 +170,8 @@
     border-radius: 0.75rem;
     overflow: hidden;
     min-height: 100%;
-    background: #fff;
+    background: var(--fpb-canvas-bg, #fff);
+    color: var(--fpb-canvas-fg, #111827);
     width: 100%;
     transition: max-width 0.2s ease;
     box-shadow: 0 1px 8px rgba(15, 23, 42, 0.04);
@@ -271,7 +290,9 @@ body.fpb-edit-mode .fpb-slot[data-drop-active="true"] {
 .fpb-style-field select {
     width: 100%; padding: 0.4rem 0.5rem; border-radius: 0.375rem;
     border: 1px solid rgba(128, 128, 128, 0.3); background: transparent;
+    color: inherit;
 }
+html.dark .fpb-style-field select { color-scheme: dark; }
 
 /* Token attributes — same names on the canvas wrapper and the public .fpb-el wrapper. */
 .fpb-block[data-fpb-padding="none"] > .fpb-block-body > *,
