@@ -9,9 +9,108 @@
  * Drop targets are slots (columns) and the root canvas. The pointer resolves to the
  * nearest valid well, so a block can land beside its siblings or inside a section.
  * Reordering is committed to Livewire in a single call per drop.
+ *
+ * Motion is Anime.js, vendored beside this file. It is deliberately optional: every
+ * animation goes through `motion`, which no-ops when the library is absent or when the
+ * reader has asked for reduced motion, and the editor stays fully usable either way.
  */
+
+/**
+ * The editor's motion vocabulary.
+ *
+ * Nothing here changes what the canvas *does* — every one of these runs after the state
+ * has already changed, purely to show which thing changed and where it went. A page
+ * builder edits by replacing chunks of the document out from under you, and without
+ * some continuity a drop reads as "nothing happened" even when it worked.
+ */
+const motion = {
+    /** Durations in ms, kept together so the whole editor stays on one rhythm. */
+    duration: { flash: 620, enter: 420, exit: 200, move: 380, marker: 160 },
+
+    get anime() {
+        return typeof window.anime === 'function' ? window.anime : null;
+    },
+
+    /**
+     * Whether to animate at all.
+     *
+     * A hidden tab has no business running timelines, and `prefers-reduced-motion` is a
+     * request, not a hint — in a tool people use all day it is the difference between
+     * usable and nauseating.
+     */
+    get enabled() {
+        return (
+            this.anime !== null &&
+            document.visibilityState === 'visible' &&
+            !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        );
+    },
+
+    /**
+     * Run `params` through Anime.js.
+     *
+     * When motion is off the animation is skipped but its `complete` callback still
+     * fires, straight away — callers hang real work off it (removing a block, tidying
+     * up inline styles) and that work has to happen either way.
+     */
+    play(params) {
+        if (!this.enabled) {
+            params.complete?.();
+
+            return null;
+        }
+
+        return this.anime(params);
+    },
+
+    /**
+     * A ring that blooms out of a block and fades.
+     *
+     * Drawn on a throwaway overlay rather than the block's own outline so it can sit on
+     * top of the block's content without the block's styles having to know about it, and
+     * so two flashes in a row cannot fight over one property.
+     */
+    flash(el, tone = 'accent') {
+        if (!el || !this.enabled) {
+            return;
+        }
+
+        const ring = document.createElement('div');
+        ring.className = 'fpb-flash';
+        ring.dataset.tone = tone;
+        el.appendChild(ring);
+
+        this.anime({
+            targets: ring,
+            opacity: [0, 1, 0],
+            scale: [0.985, 1.012],
+            easing: 'easeOutQuad',
+            duration: this.duration.flash,
+            complete: () => ring.remove(),
+        });
+    },
+
+    /** Clear anything a timeline left behind on an element it no longer owns. */
+    reset(el) {
+        if (el) {
+            el.style.opacity = '';
+            el.style.transform = '';
+        }
+    },
+};
+
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('pageBuilderCanvas', () => ({
+        /*
+         * Everything here looks elements up from `$root`, never `$el`.
+         *
+         * These methods are called from `x-on` expressions all over the tree, and inside
+         * such an expression `$el` is the element the listener sits on — the canvas, a
+         * palette button, a drag handle — not the component root. `canvas()` resolving
+         * against the canvas itself returned null, which made every drag silently do
+         * nothing. `$root` is the same element whichever handler we came in through.
+         */
+
         /** 'move' while dragging an existing block, 'insert' from the palette, null otherwise. */
         mode: null,
         payload: null,
@@ -22,30 +121,305 @@ document.addEventListener('alpine:init', () => {
         inspectorTab: 'content',
         preview: 'desktop',
 
+        /* ── Motion bookkeeping (not reactive state the template reads) ─── */
+
+        /** Block ids already on the canvas, so a re-render can tell new from moved. */
+        seen: null,
+        /** id → bounding box, taken just before a change, for the FLIP afterwards. */
+        before: null,
+        observer: null,
+        /** rAF handle and pixels-per-frame for the edge autoscroll while dragging. */
+        scrolling: null,
+        scrollSpeed: 0,
+        /** When `before` was taken, so a click that changed nothing cannot mislead us. */
+        capturedAt: 0,
+        /** A block that was just moved, to be pointed out once it has finished sliding. */
+        landing: null,
+
         init() {
             this.bind(window, 'beforeunload', (event) => this.guardUnload(event));
             this.bind(document, 'keydown', (event) => this.onKeydown(event));
 
             // Inline editing. Delegated from the root so blocks re-rendered by Livewire
             // are covered without rebinding anything.
-            this.bind(this.$el, 'focusin', (event) => this.onEditableFocus(event));
-            this.bind(this.$el, 'focusout', (event) => this.onEditableBlur(event));
-            this.bind(this.$el, 'keydown', (event) => this.onEditableKeydown(event), true);
+            this.bind(this.$root, 'focusin', (event) => this.onEditableFocus(event));
+            this.bind(this.$root, 'focusout', (event) => this.onEditableBlur(event));
+            this.bind(this.$root, 'keydown', (event) => this.onEditableKeydown(event), true);
 
             // Filament navigates between panel pages without a page load, so the browser's
             // own unload prompt never fires. Livewire's navigate event is the only chance
             // to stop the canvas being left with unsaved work.
             this.bind(document, 'livewire:navigate', (event) => this.guardNavigate(event));
 
-            this.$cleanup(() => {
-                this.teardown.forEach((off) => off());
-                this.teardown = [];
-            });
+            // Positions are taken before the click that changes them, so anything the
+            // toolbar or a block's own buttons set off — undo, redo, duplicate, delete —
+            // can be animated without every one of them having to say so.
+            this.bind(this.$root, 'pointerdown', () => this.captureRects(), true);
+
+            this.seen = new Set(this.order());
+            this.watchCanvas();
+        },
+
+        /**
+         * Alpine's teardown hook. The listeners above live on `window` and `document`,
+         * so nothing else would ever take them off: Filament's SPA navigation swaps the
+         * page out without a reload, and a second visit would otherwise stack a fresh
+         * set on top of the last.
+         */
+        destroy() {
+            this.teardown.forEach((off) => off());
+            this.teardown = [];
+            this.observer?.disconnect();
+            this.observer = null;
+            this.stopAutoscroll();
         },
 
         bind(target, event, handler, capture = false) {
             target.addEventListener(event, handler, capture);
             this.teardown.push(() => target.removeEventListener(event, handler, capture));
+        },
+
+        /* ── Showing what changed ───────────────────────── */
+
+        /**
+         * Watch the canvas and narrate whatever Livewire just did to it.
+         *
+         * Livewire replaces markup without saying what changed, so the canvas works it
+         * out by diffing: an id that was not there before has arrived, an id whose box
+         * has moved was reordered. Reading the DOM rather than hooking each action means
+         * undo, redo, duplicate and the inspector are all covered by the same code.
+         */
+        watchCanvas() {
+            const canvas = this.canvas();
+
+            if (!canvas || typeof MutationObserver === 'undefined') {
+                return;
+            }
+
+            let queued = false;
+
+            this.observer = new MutationObserver((records) => {
+                if (queued || records.every((record) => this.isOwnChrome(record))) {
+                    return;
+                }
+
+                queued = true;
+
+                // A single morph fires dozens of records; one pass per frame is plenty.
+                requestAnimationFrame(() => {
+                    queued = false;
+                    this.settle();
+                });
+            });
+
+            this.observer.observe(canvas, { childList: true, subtree: true });
+        },
+
+        /**
+         * Whether a mutation is just the editor's own decoration.
+         *
+         * The drop marker moves on every pointer move during a drag and the flash ring
+         * comes and goes on its own; both land in the canvas and would otherwise read as
+         * the page having changed — which, with the marker being 3px tall, had every
+         * block on the page twitching as the cursor went by.
+         */
+        isOwnChrome(record) {
+            const nodes = [...record.addedNodes, ...record.removedNodes];
+
+            return (
+                nodes.length > 0 &&
+                nodes.every(
+                    (node) =>
+                        node instanceof HTMLElement &&
+                        (node.classList.contains('fpb-drop-marker') || node.classList.contains('fpb-flash'))
+                )
+            );
+        },
+
+        /** Where every block sits right now, to compare against once it has changed. */
+        captureRects() {
+            if (!motion.enabled) {
+                return;
+            }
+
+            this.capturedAt = Date.now();
+            this.before = new Map(
+                Array.from(this.$root.querySelectorAll('.fpb-block')).map((el) => [
+                    el.dataset.id,
+                    el.getBoundingClientRect(),
+                ])
+            );
+        },
+
+        /** The canvas has settled: greet what is new, carry what moved. */
+        settle() {
+            const blocks = Array.from(this.$root.querySelectorAll('.fpb-block'));
+
+            // A capture belongs to the change it preceded. If a second has gone by, the
+            // click it came from did nothing to the canvas and the boxes are stale.
+            const before = Date.now() - this.capturedAt < 1500 ? this.before : null;
+
+            this.before = null;
+
+            blocks.forEach((el) => {
+                if (!this.seen.has(el.dataset.id)) {
+                    return this.enter(el);
+                }
+
+                const was = before?.get(el.dataset.id);
+
+                if (was) {
+                    this.slide(el, was);
+                }
+            });
+
+            // A block that merely moved gets no entrance, so without this the reader has
+            // to work out for themselves which of seven sliding blocks was theirs.
+            if (this.landing) {
+                motion.flash(this.blockEl(this.landing));
+                this.landing = null;
+            }
+
+            this.seen = new Set(blocks.map((el) => el.dataset.id));
+        },
+
+        /** A block that was not on the page a moment ago. */
+        enter(el) {
+            if (motion.enabled) {
+                // Set before the first frame Anime.js gets, so the block never shows at
+                // full strength and then starts its entrance from nothing.
+                el.style.opacity = '0';
+            }
+
+            motion.play({
+                targets: el,
+                opacity: [0, 1],
+                translateY: [14, 0],
+                scale: [0.985, 1],
+                easing: 'easeOutCubic',
+                duration: motion.duration.enter,
+                complete: () => motion.reset(el),
+            });
+
+            motion.flash(el);
+            this.revealBlock(el);
+        },
+
+        /**
+         * FLIP. The block is already where it belongs, so put it back visually and let
+         * it travel: transforms cost nothing per frame, whereas animating the layout
+         * itself would reflow the whole page sixty times a second.
+         */
+        slide(el, was) {
+            const now = el.getBoundingClientRect();
+            const dx = was.left - now.left;
+            const dy = was.top - now.top;
+
+            // Sub-pixel drift from a scrollbar appearing is not a move worth showing.
+            if (Math.abs(dx) < 2 && Math.abs(dy) < 2) {
+                return;
+            }
+
+            motion.play({
+                targets: el,
+                translateX: [dx, 0],
+                translateY: [dy, 0],
+                easing: 'easeOutQuad',
+                duration: motion.duration.move,
+                complete: () => motion.reset(el),
+            });
+        },
+
+        /**
+         * Bring a block into view inside the canvas.
+         *
+         * The canvas is its own scroller, so a block inserted below the fold would land
+         * out of sight and read as nothing having happened at all.
+         */
+        revealBlock(el) {
+            const frame = this.$root.querySelector('.fpb-canvas-frame');
+
+            if (!frame || !el) {
+                return;
+            }
+
+            const box = el.getBoundingClientRect();
+            const view = frame.getBoundingClientRect();
+
+            if (box.top >= view.top && box.bottom <= view.bottom) {
+                return;
+            }
+
+            const centred = (view.height - Math.min(box.height, view.height)) / 2;
+            const to = Math.max(0, frame.scrollTop + (box.top - view.top) - centred);
+
+            if (!motion.enabled) {
+                frame.scrollTop = to;
+
+                return;
+            }
+
+            // Animate a number and write it across, rather than asking Anime.js to guess
+            // what kind of property `scrollTop` is.
+            const at = { top: frame.scrollTop };
+
+            motion.play({
+                targets: at,
+                top: to,
+                easing: 'easeInOutQuad',
+                duration: 420,
+                update: () => {
+                    frame.scrollTop = at.top;
+                },
+            });
+        },
+
+        /**
+         * Scroll the canvas when a drag reaches its edge.
+         *
+         * Native drag-and-drop will not scroll a nested scroller for you, so without
+         * this there is no way to drop a block anywhere that is not already on screen —
+         * which, on a real page, is most of it.
+         */
+        autoscroll(event) {
+            const frame = this.$root.querySelector('.fpb-canvas-frame');
+
+            if (!frame) {
+                return;
+            }
+
+            const view = frame.getBoundingClientRect();
+            const zone = Math.min(110, view.height / 4);
+            const fromTop = event.clientY - view.top;
+            const fromBottom = view.bottom - event.clientY;
+
+            if (fromTop < zone) {
+                this.scrollSpeed = -Math.ceil(((zone - fromTop) / zone) * 20);
+            } else if (fromBottom < zone) {
+                this.scrollSpeed = Math.ceil(((zone - fromBottom) / zone) * 20);
+            } else {
+                return this.stopAutoscroll();
+            }
+
+            if (this.scrolling !== null) {
+                return;
+            }
+
+            const step = () => {
+                frame.scrollTop += this.scrollSpeed;
+                this.scrolling = requestAnimationFrame(step);
+            };
+
+            this.scrolling = requestAnimationFrame(step);
+        },
+
+        stopAutoscroll() {
+            if (this.scrolling !== null) {
+                cancelAnimationFrame(this.scrolling);
+                this.scrolling = null;
+            }
+
+            this.scrollSpeed = 0;
         },
 
         /* ── Leaving with unsaved work ──────────────────── */
@@ -143,11 +517,11 @@ document.addEventListener('alpine:init', () => {
 
         /** Block ids in the order they appear on the canvas, nested children included. */
         order() {
-            return Array.from(this.$el.querySelectorAll('.fpb-block')).map((el) => el.dataset.id);
+            return Array.from(this.$root.querySelectorAll('.fpb-block')).map((el) => el.dataset.id);
         },
 
         selectedHasContent() {
-            const el = this.$el.querySelector('.fpb-block[data-selected="true"]');
+            const el = this.$root.querySelector('.fpb-block[data-selected="true"]');
 
             return el ? el.dataset.hasContent === 'true' : false;
         },
@@ -158,6 +532,7 @@ document.addEventListener('alpine:init', () => {
 
             if (next) {
                 this.$wire.selectBlock(next);
+                this.revealBlock(this.blockEl(next));
             }
         },
 
@@ -178,6 +553,9 @@ document.addEventListener('alpine:init', () => {
 
             const parent = el.dataset.parent || null;
             const slot = el.dataset.slot || null;
+
+            this.captureRects();
+            this.landing = id;
 
             // moveBlock takes the index in the sibling list before the block is lifted
             // out, so moving down by one has to aim one past the neighbour it swaps with.
@@ -260,12 +638,34 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        /**
+         * Delete, but let the block leave first.
+         *
+         * The server rewrites the page around it either way; playing the exit before the
+         * call makes the gap closing up read as one movement instead of a block blinking
+         * out and everything below it jumping.
+         */
         remove(id, hasContent) {
             if (hasContent && !window.confirm('Delete this block? Its content goes with it.')) {
                 return;
             }
 
-            this.$wire.removeBlock(id);
+            const el = this.blockEl(id);
+
+            this.captureRects();
+
+            motion.play({
+                targets: el,
+                opacity: [1, 0],
+                translateX: [0, -18],
+                scale: [1, 0.97],
+                easing: 'easeInQuad',
+                duration: motion.duration.exit,
+                complete: () => {
+                    motion.reset(el);
+                    this.$wire.removeBlock(id);
+                },
+            });
         },
 
         startMove(event, id) {
@@ -280,6 +680,8 @@ document.addEventListener('alpine:init', () => {
             if (el) {
                 el.dataset.dragging = 'true';
             }
+
+            this.lift(event.currentTarget);
         },
 
         startInsert(event, type) {
@@ -287,6 +689,25 @@ document.addEventListener('alpine:init', () => {
             this.payload = type;
             event.dataTransfer.effectAllowed = 'copy';
             event.dataTransfer.setData('text/plain', type);
+
+            this.lift(event.currentTarget);
+        },
+
+        /**
+         * A press-down on the thing you just picked up.
+         *
+         * The browser has already photographed the drag image by the time this runs, so
+         * this only ever moves what stays behind — which is the point: it acknowledges
+         * the grab without the ghost under the cursor twitching.
+         */
+        lift(el) {
+            motion.play({
+                targets: el,
+                scale: [1, 0.95, 1],
+                easing: 'easeOutQuad',
+                duration: 280,
+                complete: () => motion.reset(el),
+            });
         },
 
         clearDrag() {
@@ -295,18 +716,19 @@ document.addEventListener('alpine:init', () => {
             this.target = null;
             this.removeMarker();
             this.clearSlotHighlight();
+            this.stopAutoscroll();
 
-            this.$el.querySelectorAll('.fpb-block[data-dragging]').forEach((el) => {
+            this.$root.querySelectorAll('.fpb-block[data-dragging]').forEach((el) => {
                 delete el.dataset.dragging;
             });
         },
 
         canvas() {
-            return this.$el.querySelector('.fpb-canvas');
+            return this.$root.querySelector('.fpb-canvas');
         },
 
         blockEl(id) {
-            return this.$el.querySelector(`.fpb-block[data-id="${this.cssEscape(id)}"]`);
+            return this.$root.querySelector(`.fpb-block[data-id="${this.cssEscape(id)}"]`);
         },
 
         cssEscape(value) {
@@ -426,10 +848,11 @@ document.addEventListener('alpine:init', () => {
             this.target = next;
             this.highlightSlot(next?.container);
             this.showMarker(next);
+            this.autoscroll(event);
         },
 
         onDragLeave(event) {
-            if (!this.$el.contains(event.relatedTarget)) {
+            if (!this.$root.contains(event.relatedTarget)) {
                 this.removeMarker();
                 this.clearSlotHighlight();
             }
@@ -450,7 +873,12 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            // Taken here rather than at `dragstart`: a drag lasts as long as the reader
+            // takes to aim, and these boxes are only good for about a second.
+            this.captureRects();
+
             if (mode === 'move') {
+                this.landing = payload;
                 this.$wire.moveBlock(payload, next.index, next.parent, next.slot);
             } else {
                 this.$wire.insertBlock(payload, next.index, next.parent, next.slot);
@@ -466,7 +894,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         clearSlotHighlight() {
-            this.$el.querySelectorAll('.fpb-slot[data-drop-active]').forEach((el) => {
+            this.$root.querySelectorAll('.fpb-slot[data-drop-active]').forEach((el) => {
                 delete el.dataset.dropActive;
             });
         },
@@ -490,6 +918,14 @@ document.addEventListener('alpine:init', () => {
             } else {
                 target.container.appendChild(this.marker);
             }
+
+            motion.play({
+                targets: this.marker,
+                scaleX: [0.15, 1],
+                opacity: [0, 1],
+                easing: 'easeOutQuad',
+                duration: motion.duration.marker,
+            });
         },
 
         removeMarker() {

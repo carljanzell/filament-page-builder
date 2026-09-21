@@ -112,7 +112,14 @@ html.dark .fpb {
     border: 1px solid rgba(128, 128, 128, 0.25); border-radius: 0.5rem;
     font-size: 0.85rem; background: transparent;
 }
-.fpb-palette-item:hover { border-color: currentColor; }
+.fpb-palette-item {
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.fpb-palette-item:hover {
+    border-color: #2563eb;
+    background: rgba(37, 99, 235, 0.06);
+    box-shadow: 0 1px 6px rgba(37, 99, 235, 0.12);
+}
 .fpb-palette-item:active { cursor: grabbing; }
 .fpb-palette-icon { width: 1rem; height: 1rem; flex: none; }
 
@@ -188,8 +195,8 @@ html.dark .fpb {
 .fpb-canvas[data-preview="tablet"] { max-width: 768px; }
 .fpb-canvas[data-preview="mobile"] { max-width: 390px; }
 
-.fpb-block { position: relative; }
-.fpb-block[data-dragging="true"] { opacity: 0.45; }
+.fpb-block { position: relative; transition: opacity 0.15s ease; }
+.fpb-block[data-dragging="true"] { opacity: 0.4; }
 .fpb-block::after {
     content: ''; position: absolute; inset: 0; pointer-events: none;
     outline: 2px solid transparent; outline-offset: -2px; transition: outline-color 0.15s;
@@ -273,7 +280,41 @@ body.fpb-edit-mode .fpb-slot[data-drop-active="true"] {
     text-align: center; font-size: 0.78rem; opacity: 0.55;
 }
 
-.fpb-drop-marker { height: 3px; background: #2563eb; margin: 0; border-radius: 2px; }
+/*
+ * The line that says "here". Scaled in from the centre by the canvas script, so the
+ * origin has to be the middle rather than the inline-start edge the default would use.
+ */
+.fpb-drop-marker {
+    height: 3px; background: #2563eb; margin: 0; border-radius: 2px;
+    transform-origin: center;
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25), 0 2px 10px rgba(37, 99, 235, 0.45);
+}
+
+/*
+ * The ring that blooms out of a block when it arrives or moves.
+ *
+ * A throwaway overlay, added and removed by the script, so it can sit over the block's
+ * own content without the block's styles having to make room for it, and so two flashes
+ * in quick succession cannot fight over the same property.
+ */
+.fpb-flash {
+    position: absolute; z-index: 1; pointer-events: none; opacity: 0;
+    /*
+     * Drawn a few pixels outside the block, not over it. A divider or a spacer is one
+     * or two pixels tall, and a ring confined to its own box would be invisible on
+     * exactly the blocks whose arrival is hardest to spot.
+     */
+    inset: -6px;
+    border-radius: 0.4rem;
+    outline: 2px solid #2563eb;
+    background: rgba(37, 99, 235, 0.07);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16), 0 8px 26px rgba(37, 99, 235, 0.22);
+}
+.fpb-flash[data-tone="danger"] {
+    outline-color: #dc2626;
+    background: rgba(220, 38, 38, 0.07);
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.16);
+}
 
 .fpb-empty { padding: 3rem 1rem; text-align: center; opacity: 0.6; font-size: 0.9rem; }
 
@@ -397,6 +438,21 @@ body.fpb-edit-mode .fi-main-ctn {
 
     .fpb-palette { border-right: 0; border-bottom: 1px solid rgba(128, 128, 128, 0.22); }
     .fpb-inspector { border-left: 0; border-top: 1px solid rgba(128, 128, 128, 0.22); }
+}
+
+/*
+ * Reduced motion. The canvas script checks this too and skips its timelines; this is
+ * the other half, for the transitions CSS owns. An editor someone is in all day is
+ * exactly where the preference matters most.
+ */
+@media (prefers-reduced-motion: reduce) {
+    .fpb *,
+    .fpb *::before,
+    .fpb *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
 }
 
 [x-cloak] { display: none !important; }
