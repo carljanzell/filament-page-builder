@@ -107,6 +107,24 @@ FilamentPageBuilderPlugin::make()
     ->canvasStylesView('filament.pages.canvas-styles')
 ```
 
+Scope that view's rules to `.fpb-canvas`. A bare `body` or `h2` rule leaks out of the
+canvas and restyles the builder around it.
+
+### Theming the chrome
+
+The builder follows the panel's light and dark mode on its own. Four variables override
+what it picks, set on `:root` for light and on `html.dark .fpb` for dark:
+
+| Variable | Default | What it paints |
+| --- | --- | --- |
+| `--fpb-editor-bg` | `#f4f4f5` | Behind the whole editor |
+| `--fpb-panel-bg` | `#fff` | The toolbar, palette and inspector |
+| `--fpb-raised-bg` | `#fff` | The selected tab and preview-width pill |
+| `--fpb-canvas-bg` / `--fpb-canvas-fg` | `#fff` / `#111827` | The page preview itself |
+
+The canvas keeps its light default in dark mode, because it is a preview of a public
+page rather than part of the admin chrome. Change the last pair if your site is dark.
+
 ## Editing on the page
 
 A block can open its own text fields for editing directly on the canvas. Declare which

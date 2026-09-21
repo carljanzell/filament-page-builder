@@ -52,7 +52,9 @@ class PageBuilderServiceProvider extends ServiceProvider
      *
      * Written by hand and shipped unminified on purpose: requiring consumers to run a
      * JS build would make the package unusable on hosts without Node, which is exactly
-     * the situation it was written for.
+     * the situation it was written for. Anime.js is vendored in for the same reason —
+     * a checked-in UMD build needs no bundler and no CDN at runtime. The canvas degrades
+     * to no animation at all if it is missing, so it is a nicety, not a hard dependency.
      */
     protected function registerAssets(): void
     {
@@ -61,6 +63,7 @@ class PageBuilderServiceProvider extends ServiceProvider
         }
 
         FilamentAsset::register([
+            Js::make('page-builder-anime', __DIR__.'/../resources/js/vendor/anime.min.js'),
             Js::make('page-builder', __DIR__.'/../resources/js/page-builder.js'),
             Css::make('page-builder', __DIR__.'/../resources/css/page-builder.css'),
         ], static::PACKAGE);
