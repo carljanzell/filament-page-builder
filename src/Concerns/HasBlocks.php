@@ -3,13 +3,15 @@
 namespace CarlJanzell\FilamentPageBuilder\Concerns;
 
 use CarlJanzell\FilamentPageBuilder\FilamentPageBuilderPlugin;
+use CarlJanzell\FilamentPageBuilder\Support\BlockTree;
 use Illuminate\Support\Str;
 
 /**
  * Applied by the consuming application to whichever model stores page blocks.
  *
  * The package never owns the table. It only needs the blocks to be an array of
- * ['id' => ..., 'type' => ..., 'data' => [...]] entries.
+ * typed entries. Nesting is expressed with parent/slot/position on that same
+ * flat list — see BlockTree.
  */
 trait HasBlocks
 {
@@ -20,7 +22,7 @@ trait HasBlocks
     {
         $attribute = $this->blocksAttribute();
 
-        return is_array($this->{$attribute} ?? null) ? $this->{$attribute} : [];
+        return BlockTree::hydrate(is_array($this->{$attribute} ?? null) ? $this->{$attribute} : []);
     }
 
     /**

@@ -19,7 +19,9 @@ class SecondPanelProvider extends PanelProvider
             ->id('second')
             ->path('second')
             ->plugin(
-                FilamentPageBuilderPlugin::make()->blocks([HeadingBlock::class]),
+                FilamentPageBuilderPlugin::make()
+                    ->includeLayoutBlocks(false)
+                    ->blocks([HeadingBlock::class]),
             );
     }
 }

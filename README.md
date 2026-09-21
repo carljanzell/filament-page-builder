@@ -5,11 +5,10 @@ content as an ordered array of typed blocks in a single JSON column.
 
 **📖 [Documentation](https://carljanzell.github.io/filament-page-builder/)**
 
-> **Status: the canvas is usable, and text is edited on the page.** Palette, drag to
-> insert and reorder, duplicate, delete, selection, a live inspector, undo/redo, keyboard
-> shortcuts, and inline editing of a block's own text fields — all persisting to the same
-> JSON the form editor uses. Still to come: nesting (sections and columns), a style
-> inspector, rich text in place, draft/publish and reusable sections. See
+> **Status: the canvas is a nested layout editor.** Palette with layout
+> primitives, drag into columns, a document outline, token style inspector, inline text
+> editing, undo/redo and keyboard shortcuts — all persisting to the same JSON the form
+> editor uses. Still to come: rich text in place, draft/publish and reusable sections. See
 > [ROADMAP.md](ROADMAP.md).
 
 ## Why
@@ -48,6 +47,8 @@ $panel->plugin(
             HeroBlock::class,
             RichTextBlock::class,
         ])
+        // Section, text, image, button, spacer and divider ship with the package.
+        // Register a class with the same type() to replace one.
         ->recordModel(\App\Models\Page::class)
         ->blocksAttribute('blocks'),
 );
@@ -78,7 +79,8 @@ class DesignPage extends BaseDesignPage
 ```
 
 Register it as a resource page and the canvas is available at
-`/admin/pages/{record}/design`:
+`/admin/pages/{record}/design` as a full-screen editor — Filament's sidebar and
+page heading stay behind so the page itself is the workspace:
 
 ```php
 public static function getPages(): array
@@ -91,7 +93,9 @@ public static function getPages(): array
 ```
 
 Blocks are mutated in memory and written on an explicit save, so a drag never waits on a
-database round trip.
+database round trip. Drop a **Section** to get columns; drag text, images and your own
+blocks into a column. Click a block and open the **Style** tab for
+padding, width, background and alignment — tokens, not raw CSS.
 
 ### Making the canvas match your site
 
@@ -162,6 +166,20 @@ class HeroBlock implements PageBlock
 
 `fileFields()` is explicit rather than inferred: an upload is an array in form state but a
 plain path once stored, and a map of strings is indistinguishable from a repeater item.
+
+## Rendering publicly
+
+A naive `@foreach` of the stored array will also print the children of a section as
+top-level blocks. Use the shipped renderer, which walks the tree:
+
+```blade
+<x-page-builder::blocks :blocks="$page->blocks" />
+```
+
+Each column renders as a `.fpb-slot` inside its `.fpb-section`. That wrapper is what
+keeps a column's blocks in that column — a section is a grid, and without it every
+block becomes its own grid cell. Ship the package stylesheet on the public site, or
+give `.fpb-section` and `.fpb-slot` the equivalent rules in your own theme.
 
 ## Tests
 

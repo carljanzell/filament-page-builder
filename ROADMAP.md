@@ -1,11 +1,11 @@
 # Filament Page Builder — Roadmap to full page control
 
-**Status:** Stage 0 and Stage B's text editing are **done and shipped**. The canvas has a
-test suite (75 tests), no longer destroys content it does not recognise, honours its own
-configuration, gives each panel its own registry, has undo/redo with keyboard shortcuts
-and guards, and lets an editor type straight into a block's own text on the page.
+**Status:** Stage 0, Stage B's text editing, and Stage C (nesting, style tokens,
+responsive preview) are **done and shipped**. The canvas is a nested layout
+editor: sections and columns, drag into a slot, a document outline, and a token style
+inspector, on a dedicated full-screen Design page. The suite is at 105 tests.
 
-Next up: rich text in place, then nesting (§4).
+Next up: rich text in place, then Stage D (draft/publish).
 
 **Where we want to get to:** the editor manipulates the *page*, not a list of panels —
 click a heading and type into it, drop a text box into a column, set spacing and
@@ -53,7 +53,7 @@ poster-like section. Escape hatch without giving up the model.
 
 ### Two further decisions, settled
 
-- **"Textboxes" means draggable text boxes**, WordPress-style — a text primitive you drop
+- **"Textboxes" means draggable text boxes** — a text primitive you drop
   anywhere and type into. *Not* on-page form inputs. Form submissions are out of scope;
   Stage E is the free-canvas hatch only.
 - **The no-build rule is broken**, deliberately and only inside this repo. The package may
@@ -139,9 +139,9 @@ into block state.
 
 ---
 
-## 4. Stage C — structure and style ("textboxes, columns, spacing")
+## 4. Stage C — structure and style ("textboxes, columns, spacing") ✅ done
 
-### 4.1 Storage v2 — flat tree
+### 4.1 Storage v2 — flat tree ✅
 
 Nesting is the real cost of containers. Nested arrays make every move a path-splice and
 undo a deep diff. Go flat instead:
@@ -161,7 +161,7 @@ Moves become "set parent/slot/position" — O(1), trivially undoable, and the wh
 one array to diff. Ship a read-time upgrader from v1 so existing content migrates on first
 open, with a `pages:upgrade-blocks` command for bulk.
 
-### 4.2 Container blocks (shipped by the package, app-overridable)
+### 4.2 Container blocks (shipped by the package, app-overridable) ✅
 
 - `SectionBlock` — full-bleed or contained, N columns with a ratio picker (1, 1-1, 1-2, 1-1-1, …), per-slot children.
 - `SpacerBlock`, `DividerBlock`.
@@ -171,7 +171,7 @@ open, with a `pages:upgrade-blocks` command for bulk.
 Nested drag-and-drop: drop targets become slots, with the marker resolving to the nearest
 valid slot. This is where the native HTML5 DnD API starts to hurt — see §6.
 
-### 4.3 The style inspector — tokens, not CSS
+### 4.3 The style inspector — tokens, not CSS ✅
 
 A second inspector tab, driven by a schema the *app* supplies so it maps onto its own
 design tokens:
@@ -191,7 +191,7 @@ the app's stylesheet. An editor cannot produce a 13px lime heading, which is the
 
 Also per-block: **visibility per breakpoint**, and an **anchor id** for in-page links.
 
-### 4.4 Responsive preview
+### 4.4 Responsive preview ✅
 
 Width toggle (desktop / tablet / mobile) on the toolbar. Because the canvas renders inline
 rather than in an iframe, this is a `max-width` on the canvas wrapper — which only tells
@@ -243,11 +243,10 @@ correct).
 ## 7. Suggested sequencing
 
 1. ~~**Stage 0** — tests, data-loss fixes, undo, guards.~~ Done.
-2. **Stage B** — ~~inline text~~ done; rich text, images and links still to come. No storage change.
-3. **Stage C.1** — storage v2 upgrade, shipped alone and verified before anything depends on it.
-4. **Stage C.2–C.4** — containers, style tokens, responsive preview.
-5. **Stage D** — draft/publish and revisions before reusable sections.
-6. **Stage E** — the `FreeCanvasBlock` hatch, if it is still wanted by then.
+2. **Stage B** — ~~inline text~~ done; rich text, images and links still to come.
+3. ~~**Stage C** — storage v2, containers, style tokens, responsive preview.~~ Done.
+4. **Stage D** — draft/publish and revisions before reusable sections.
+5. **Stage E** — the `FreeCanvasBlock` hatch, if it is still wanted by then.
 
 ---
 

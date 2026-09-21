@@ -166,6 +166,7 @@ footer { margin-top: 4.5rem; padding-top: 1.5rem; border-top: 1px solid var(--ru
     <ol>
       <li><a href="#data">The stored shape</a></li>
       <li><a href="#blocks">Defining a block</a></li>
+      <li><a href="#layout">Sections and columns</a></li>
       <li><a href="#inline">Editing on the page</a></li>
       <li><a href="#register">Registering blocks</a></li>
       <li><a href="#canvas">Adding the canvas</a></li>
@@ -213,22 +214,27 @@ back again. If you later decide the canvas was a mistake, removing it costs you 
 
 <h3>What the canvas does today</h3>
 <ul>
-  <li>A palette of your registered block types, on the left</li>
-  <li>Drag from the palette onto the page, at the position you want</li>
-  <li>Drag rendered blocks to reorder them</li>
+  <li>A <strong>full-screen Design page</strong> &mdash; the editor owns the viewport, not a squeezed Filament content column</li>
+  <li>A palette grouped by kind: Layout, Content, Design, then your own blocks</li>
+  <li>Drag from the palette onto the page, <strong>or into a column</strong></li>
+  <li>Drag the handle on a rendered block to reorder it, including across sections</li>
+  <li>A document outline (Structure) that follows the tree</li>
   <li>Click a block to select it; edit it in an inspector on the right, using that block&rsquo;s own Filament schema</li>
+  <li>A <strong>Style</strong> tab of design tokens — padding, background, width, alignment — not raw CSS</li>
+  <li>Desktop / tablet / mobile preview widths on the toolbar</li>
   <li><strong>Type into the page itself</strong> — a block can open its own text fields for editing in place, and
       the inspector follows the caret</li>
-  <li>Duplicate and delete, with a confirmation before anything holding content goes</li>
+  <li>Duplicate and delete, with a confirmation before anything holding content goes. Duplicating a section
+      copies the blocks inside it.</li>
   <li>Undo and redo, keyboard shortcuts, and a guard against leaving with unsaved work</li>
   <li>Blocks render with your real Blade components and your real CSS, not a stand-in</li>
   <li>Everything is held in memory and written on an explicit <strong>Save</strong>, so a drag never waits on the server</li>
 </ul>
 
 <h3>What it deliberately does not do</h3>
-<p>No free positioning, no arbitrary nesting, no columns inside columns, no theme or global-style editing.
-A constrained palette that always produces on-brand output is the point. Free positioning mostly gives
-editors new ways to break your design.</p>
+<p>No free positioning, no pixel-level canvas. Blocks stay the unit of layout — typed
+components in a tree, not a free-form artboard. A constrained palette that always produces
+on-brand output is the point. Free positioning mostly gives editors new ways to break your design.</p>
 
 <div class="note">
   <span class="note-t">Design principles</span>
@@ -301,27 +307,31 @@ extend and no migration to run.</p>
     }
 }</code></pre>
 
-<div class="warn">
-  <span class="warn-t">Column name is fixed</span>
-  <p style="margin-bottom:0">The plugin exposes a <code>blocksAttribute()</code> setting, but the canvas does
-  not currently read it — it always reads and writes an attribute literally named <code>blocks</code>. Until
-  that is fixed, name your column <code>blocks</code>. See <a href="#limitations">Known limitations</a>.</p>
-</div>
-
 <h2 id="data">The stored shape <a class="anchor" href="#data">#</a></h2>
 
-<p>One JSON column holds an ordered array. Every entry has exactly three keys:</p>
+<p>One JSON column holds a flat array. Nesting is expressed with <code>parent</code>, <code>slot</code> and
+<code>position</code> on that same list, so a move is &ldquo;set these three keys&rdquo; rather than a
+path-splice of nested arrays. Pages written before nesting existed have none of those keys and become a
+list of roots — opening one does not change what it looks like.</p>
 
 <pre><code>[
   {
-    "id": "0193f2a1-8c4e-7bd1-9a20-3f5e1c7a44b0",
-    "type": "hero",
-    "data": { "heading": "Welcome", "image": "pages/banner.jpg" }
+    "id": "s",
+    "type": "section",
+    "data": { "columns": 2, "ratio": "1-1" },
+    "parent": null,
+    "slot": null,
+    "position": 0,
+    "settings": { "padding": "lg" }
   },
   {
-    "id": "0193f2a1-8c4e-7bd1-9a20-3f5e1c7a44b1",
-    "type": "rich_text",
-    "data": { "body": "&lt;p&gt;Stored as HTML.&lt;/p&gt;" }
+    "id": "t",
+    "type": "text",
+    "data": { "body": "Hello" },
+    "parent": "s",
+    "slot": "col-0",
+    "position": 0,
+    "settings": {}
   }
 ]</code></pre>
 
@@ -332,14 +342,18 @@ extend and no migration to run.</p>
 <tr><td><code>id</code></td><td>Stable identity, so reordering does not change what a block <em>is</em>. Minted automatically the first time a record is opened on the canvas, then persisted. You never set it.</td></tr>
 <tr><td><code>type</code></td><td>The machine name from your block&rsquo;s <code>type()</code>. Never change one once content exists.</td></tr>
 <tr><td><code>data</code></td><td>Whatever that block&rsquo;s Filament schema produces, in its <em>stored</em> shape — rich text as an HTML string, uploads as a plain path.</td></tr>
+<tr><td><code>parent</code></td><td>The id of the container this block sits in, or <code>null</code> for a root.</td></tr>
+<tr><td><code>slot</code></td><td>Which well of that container — <code>col-0</code>, <code>col-1</code>, &hellip;</td></tr>
+<tr><td><code>position</code></td><td>Order among siblings in that slot.</td></tr>
+<tr><td><code>settings</code></td><td>Style tokens from the inspector: names, not CSS.</td></tr>
 </tbody>
 </table>
 </div>
 
-<div class="warn">
-  <span class="warn-t">Extra keys are not preserved</span>
-  <p style="margin-bottom:0">The canvas rebuilds every block as exactly <code>id</code>, <code>type</code>,
-  <code>data</code> when it loads. Any other key you add is dropped on the next save.</p>
+<div class="note">
+  <span class="note-t">Extra keys are preserved</span>
+  <p style="margin-bottom:0">Anything you attach to a block beyond these keys is carried through a load and
+  a save untouched. The canvas merges, it does not rebuild.</p>
 </div>
 
 <h2 id="blocks">Defining a block <a class="anchor" href="#blocks">#</a></h2>
@@ -427,6 +441,56 @@ Read every field defensively — content written under an older schema will stil
   editor&rsquo;s live preview. That is what stops the surfaces from drifting apart — but it also means it must
   survive being handed half-finished data mid-edit. Defensive <code>??</code> everywhere.</p>
 </div>
+
+<h2 id="layout">Sections and columns <a class="anchor" href="#layout">#</a></h2>
+
+<p>The package ships layout primitives so a new panel already has something to compose
+with. They appear in the palette automatically. Register a class with the same <code>type()</code> to
+replace one, or pass <code>includeLayoutBlocks(false)</code> to hide them all.</p>
+
+<div class="tw">
+<table>
+<thead><tr><th>Type</th><th>What it is</th></tr></thead>
+<tbody>
+<tr><td><code>section</code></td><td>A row of 1–4 columns. Other blocks drop into a column.</td></tr>
+<tr><td><code>text</code></td><td>A text box you drop anywhere and type into.</td></tr>
+<tr><td><code>image</code></td><td>An image plus alt text.</td></tr>
+<tr><td><code>button</code></td><td>A labelled link.</td></tr>
+<tr><td><code>spacer</code></td><td>Vertical space, token-sized.</td></tr>
+<tr><td><code>divider</code></td><td>A horizontal rule.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Your own blocks drop into those columns the same way. A section may sit inside a section, up to five
+levels deep — enough for the layouts people actually build, not enough to bury content by accident.</p>
+
+<p>A container is any block that implements <code>Container</code> and declares <code>slots()</code>. The
+block&rsquo;s own Blade view asks <code>PageBuilder::slot($name)</code> for each well; on the canvas that
+call wraps a drop target, on the public page it is just the children.</p>
+
+<pre><code>use CarlJanzell\FilamentPageBuilder\PageBuilder;
+
+&lt;section class="fpb-section" data-fpb-ratio="{{ $data['ratio'] ?? '1-1' }}"&gt;
+    @foreach (PageBuilder::slotNames() as $name)
+        {!! PageBuilder::slot($name) !!}
+    @endforeach
+&lt;/section&gt;</code></pre>
+
+<h3>Style tokens</h3>
+<p>The inspector&rsquo;s Style tab writes names onto <code>settings</code>, emitted as
+<code>data-fpb-padding="lg"</code> on the wrapper. Point the plugin at your own token set so the knobs
+map onto your stylesheet:</p>
+
+<pre><code>FilamentPageBuilderPlugin::make()
+    -&gt;styleTokens([
+        'padding'    =&gt; ['none' =&gt; 'None', 'sm' =&gt; 'Small', 'md' =&gt; 'Medium', 'lg' =&gt; 'Large'],
+        'background' =&gt; ['none' =&gt; 'None', 'maroon' =&gt; 'Maroon', 'forest' =&gt; 'Forest'],
+        'width'      =&gt; ['narrow' =&gt; 'Narrow', 'default' =&gt; 'Default', 'wide' =&gt; 'Wide', 'full' =&gt; 'Full'],
+        'align'      =&gt; ['start' =&gt; 'Start', 'center' =&gt; 'Center', 'end' =&gt; 'End'],
+    ])</code></pre>
+
+<p>An editor cannot produce a 13px lime heading, because the knobs are this list, not a colour picker.</p>
 
 <h2 id="inline">Editing on the page <a class="anchor" href="#inline">#</a></h2>
 
@@ -526,6 +590,8 @@ public function panel(Panel $panel): Panel
                     CustomHtmlBlock::class,
                 ])
                 -&gt;canvasStylesView('filament.pages.canvas-styles'),
+                // Section, text, image, button, spacer and divider are registered
+                // unless you pass -&gt;includeLayoutBlocks(false)
         ]);
 }</code></pre>
 
@@ -543,6 +609,11 @@ class DesignPage extends BaseDesignPage
 {
     protected static string $resource = PageResource::class;
 }</code></pre>
+
+<p>The canvas is a dedicated full-screen editor. Filament&rsquo;s sidebar, topbar and page heading
+stay behind so the page itself is the workspace &mdash; palette, canvas and inspector, with a
+slim bar for Back, preview widths and Save. The browser tab still reads
+<code>Design: {record}</code>.</p>
 
 <p>Then register the route on the resource:</p>
 
@@ -572,12 +643,8 @@ canvas too — you configure nothing.</p>
 <p>Mutations apply in memory and mark the page dirty; nothing is written until the editor presses
 <strong>Save layout</strong>.</p>
 
-<div class="warn">
-  <span class="warn-t">There is no unsaved-changes guard</span>
-  <p style="margin-bottom:0">Navigating away — including the &ldquo;Form editor&rdquo; link — discards unsaved
-  work silently, and there is no undo. Deleting a block asks for no confirmation. Warn your editors, or add
-  a <code>beforeunload</code> handler on your subclass&rsquo;s view.</p>
-</div>
+<p>Navigating away with unsaved work prompts; deleting a block that holds content asks first. Undo lives
+for the life of the canvas session.</p>
 
 <h2 id="form">Keeping the form editor <a class="anchor" href="#form">#</a></h2>
 
@@ -613,31 +680,17 @@ class PageBlocks
 
 <h2 id="render">Rendering on your public site <a class="anchor" href="#render">#</a></h2>
 
-<p>The package does not ship a renderer, because rendering is markup and markup is yours. It is about ten
-lines — resolve each type through the registry and dispatch:</p>
+<p>Once a page has sections, a naive <code>@foreach</code> of the stored array will also print the children
+as extra top-level blocks. Use the shipped tree renderer:</p>
 
-<p class="filename">resources/views/components/blocks/render.blade.php</p>
-<pre><code>@props(['blocks' =&gt; []])
+<pre><code>&lt;x-page-builder::blocks :blocks="$page-&gt;blocks" /&gt;</code></pre>
 
-@php
-    $registry = app(\CarlJanzell\FilamentPageBuilder\BlockRegistry::class);
-@endphp
+<p>It walks roots only, fills each container&rsquo;s slots, and skips unknown types — a block you removed
+last year leaves a hole in one page, not a 500 across the site. Style tokens are emitted as
+<code>data-fpb-*</code> on a <code>.fpb-el</code> wrapper so your stylesheet can honour them.</p>
 
-@foreach (is_array($blocks) ? $blocks : [] as $block)
-    @continue(! is_array($block))
-    @php $view = $registry-&gt;view($block['type'] ?? null); @endphp
-    @continue(! $view)
-
-    &lt;x-dynamic-component :component="$view" :data="$block['data'] ?? []" /&gt;
-@endforeach</code></pre>
-
-<p>Used from a page template:</p>
-
-<pre><code>&lt;x-blocks.render :blocks="$page-&gt;blocks" /&gt;</code></pre>
-
-<p>Note the two <code>@continue</code> guards. <code>view()</code> returns <code>null</code> for a type that is
-not registered, and skipping is deliberate: a block type you removed last year should leave a hole in one
-page, not a 500 across the site.</p>
+<p>Pages that are still a flat list of roots keep working with a hand-rolled loop. The moment an editor
+drops a section, switch to the component.</p>
 
 <h2 id="authorisation">Authorisation <a class="anchor" href="#authorisation">#</a></h2>
 
@@ -761,7 +814,9 @@ drag gesture waits on a round trip.</p>
 <table>
 <thead><tr><th>Method</th><th>Effect</th></tr></thead>
 <tbody>
-<tr><td><code>blocks(array $classes)</code></td><td>Block classes to register. Palette order follows this array.</td></tr>
+<tr><td><code>blocks(array $classes)</code></td><td>Your block classes. Layout primitives are registered in front unless disabled.</td></tr>
+<tr><td><code>includeLayoutBlocks(bool $on = true)</code></td><td>Whether section, text, image, button, spacer and divider appear. Default true.</td></tr>
+<tr><td><code>styleTokens(array $tokens)</code></td><td>The Style tab&rsquo;s knobs. Default padding/background/width/align.</td></tr>
 <tr><td><code>canvasStylesView(?string $view)</code></td><td>A Blade view included inside the canvas, before the blocks.</td></tr>
 <tr><td><code>recordModel(string $model)</code></td><td>The model whose records the builder edits.</td></tr>
 <tr><td><code>blocksAttribute(string $attr)</code></td><td>The JSON attribute holding the blocks. A record using <code>HasBlocks</code> may override it for itself.</td></tr>
@@ -783,6 +838,10 @@ drag gesture waits on a round trip.</p>
 <tr><td><code>isVisible(?string $type)</code></td><td>Whether the current user may author it. Use this to gate authoring.</td></tr>
 <tr><td><code>view(?string $type)</code></td><td>Blade component name, or <code>null</code> for an unknown type.</td></tr>
 <tr><td><code>fileFields(?string $type)</code></td><td>That block&rsquo;s declared upload fields, or <code>[]</code>.</td></tr>
+<tr><td><code>isContainer(?string $type)</code></td><td>Whether the type implements <code>Container</code>.</td></tr>
+<tr><td><code>slots(?string $type, array $data)</code></td><td>Slot names that instance currently exposes.</td></tr>
+<tr><td><code>defaults(?string $type)</code></td><td>Starting data for a freshly dropped block.</td></tr>
+<tr><td><code>category(?string $type)</code></td><td>Palette group. App blocks default to <code>blocks</code>.</td></tr>
 </tbody>
 </table>
 </div>
@@ -793,8 +852,8 @@ drag gesture waits on a round trip.</p>
 <table>
 <thead><tr><th>Method</th><th>Effect</th></tr></thead>
 <tbody>
-<tr><td><code>moveBlock(string $id, int $to)</code></td><td>Reorder to a target index.</td></tr>
-<tr><td><code>insertBlock(string $type, ?int $at = null)</code></td><td>Insert at an index, or append. Refused unless authorised.</td></tr>
+<tr><td><code>moveBlock(string $id, int $to, ?string $parent = null, ?string $slot = null)</code></td><td>Reorder, or move into a container slot.</td></tr>
+<tr><td><code>insertBlock(string $type, ?int $at = null, ?string $parent = null, ?string $slot = null)</code></td><td>Insert at an index, or into a slot. A palette click with a selection inserts after it, or into its first column. Refused unless authorised.</td></tr>
 <tr><td><code>duplicateBlock(string $id)</code></td><td>Copy in place with a fresh id. Refused unless authorised.</td></tr>
 <tr><td><code>removeBlock(string $id)</code></td><td>Delete. No confirmation.</td></tr>
 <tr><td><code>selectBlock(?string $id)</code></td><td>Select a block and load it into the inspector.</td></tr>
@@ -804,7 +863,9 @@ drag gesture waits on a round trip.</p>
 </table>
 </div>
 <p>Public properties: <code>$blocks</code>, <code>$selectedId</code>, <code>$blockData</code>,
-<code>$isDirty</code>. Computed: <code>$this-&gt;renderableBlocks</code>, <code>$this-&gt;palette</code>.</p>
+<code>$blockSettings</code>, <code>$isDirty</code>. Computed: <code>$this-&gt;rootBlocks</code>,
+<code>$this-&gt;renderableBlocks</code>, <code>$this-&gt;palette</code>, <code>$this-&gt;paletteGroups</code>,
+<code>$this-&gt;structure</code>.</p>
 
 <h3><code>HasBlocks</code> <span class="pill">optional</span></h3>
 <p>A convenience trait for your model — <code>getBlocks()</code> returns the array defensively, and
@@ -817,10 +878,6 @@ it reads the attribute directly.</p>
 on save, a hardcoded column name, one registry shared between panels, no undo, no test suite — have since been
 fixed and are gone from this list.</p>
 
-<h4>Nesting is not supported yet</h4>
-<p>Blocks are a flat, ordered list. There are no sections, columns or containers, so a block cannot hold other
-blocks. This is the next thing to change and it will come with a storage format change.</p>
-
 <h4>Rich text is still edited in the inspector, not in place</h4>
 <p>Plain text fields are edited directly on the page. A <code>RichEditor</code> still opens on the right.
 TipTap owns that HTML format and a second, hand-rolled producer of it would drift from the first — the
@@ -829,10 +886,6 @@ intended fix is to mount Filament&rsquo;s own TipTap bundle in place, not to wri
 <h4>Inline editing is limited to top-level string fields</h4>
 <p><code>setBlockField()</code> writes one named field on one block. Fields inside a repeater cannot be edited
 in place, and only fields the block names in <code>editables()</code> can be written at all.</p>
-
-<h4>No layout or style controls</h4>
-<p>Padding, background, width and per-breakpoint visibility are whatever the block&rsquo;s own markup decides.
-There is no style inspector yet.</p>
 
 <h4>No draft, no revisions</h4>
 <p>Saving writes straight to the record the public site reads. There is no draft copy to promote and no history

@@ -1,38 +1,129 @@
-@use('CarlJanzell\FilamentPageBuilder\PageBuilder')
-
 <x-filament-panels::page>
     <div
         class="fpb"
         x-data="pageBuilderCanvas()"
         wire:key="fpb-{{ $this->getRecord()->getKey() }}"
     >
-        {{-- Keyboard shortcuts and the unsaved-changes guard are bound to the document,
-             so they work wherever the focus happens to be on the page. --}}
+        <header class="fpb-chrome">
+            <div class="fpb-chrome-start">
+                @if ($exitUrl = $this->exitUrl())
+                    <a href="{{ $exitUrl }}" class="fpb-back">{{ $this->exitLabel() }}</a>
+                @endif
+
+                <h1 class="fpb-chrome-title">{{ $this->getRecordTitle() }}</h1>
+
+                <span class="fpb-status" @class(['fpb-status-dirty' => $this->isDirty])>
+                    {{ $this->isDirty ? 'Unsaved changes' : 'All changes saved' }}
+                </span>
+            </div>
+
+            <div class="fpb-preview-toggle" role="group" aria-label="Preview width">
+                <button type="button" class="fpb-preview-btn" :data-active="preview === 'desktop'" x-on:click="preview = 'desktop'" title="Desktop">Desktop</button>
+                <button type="button" class="fpb-preview-btn" :data-active="preview === 'tablet'" x-on:click="preview = 'tablet'" title="Tablet">Tablet</button>
+                <button type="button" class="fpb-preview-btn" :data-active="preview === 'mobile'" x-on:click="preview = 'mobile'" title="Mobile">Mobile</button>
+            </div>
+
+            <div class="fpb-toolbar-actions">
+                <x-filament::icon-button
+                    icon="heroicon-m-arrow-uturn-left"
+                    label="Undo"
+                    color="gray"
+                    size="sm"
+                    wire:click="undo"
+                    :disabled="! $this->canUndo"
+                />
+
+                <x-filament::icon-button
+                    icon="heroicon-m-arrow-uturn-right"
+                    label="Redo"
+                    color="gray"
+                    size="sm"
+                    wire:click="redo"
+                    :disabled="! $this->canRedo"
+                />
+
+                @if ($formEditorUrl = $this->formEditorUrl())
+                    <x-filament::button
+                        tag="a"
+                        href="{{ $formEditorUrl }}"
+                        color="gray"
+                        size="sm"
+                    >
+                        Form editor
+                    </x-filament::button>
+                @endif
+
+                <x-filament::button
+                    wire:click="save"
+                    wire:loading.attr="disabled"
+                    size="sm"
+                >
+                    Save layout
+                </x-filament::button>
+            </div>
+        </header>
+
         {{-- Palette --}}
         <aside class="fpb-panel fpb-palette">
-            <h2 class="fpb-panel-title">Blocks</h2>
-            <p class="fpb-panel-hint">Drag onto the page, or click to append.</p>
+            <div class="fpb-side-tabs" role="tablist">
+                <button
+                    type="button"
+                    role="tab"
+                    class="fpb-side-tab"
+                    :data-active="sideTab === 'blocks'"
+                    x-on:click="sideTab = 'blocks'"
+                >Blocks</button>
+                <button
+                    type="button"
+                    role="tab"
+                    class="fpb-side-tab"
+                    :data-active="sideTab === 'structure'"
+                    x-on:click="sideTab = 'structure'"
+                >Structure</button>
+            </div>
 
-            <ul class="fpb-palette-list">
-                @foreach ($this->palette as $item)
-                    <li>
-                        <button
-                            type="button"
-                            class="fpb-palette-item"
-                            draggable="true"
-                            data-type="{{ $item['type'] }}"
-                            x-on:dragstart="startInsert($event, '{{ $item['type'] }}')"
-                            x-on:dragend="clearDrag()"
-                            wire:click="insertBlock('{{ $item['type'] }}')"
-                        >
-                            @if ($item['icon'])
-                                <x-filament::icon :icon="$item['icon']" class="fpb-palette-icon" />
-                            @endif
-                            <span>{{ $item['label'] }}</span>
-                        </button>
-                    </li>
+            <div x-show="sideTab === 'blocks'">
+                <p class="fpb-panel-hint">Drag onto the page or into a column. Click to insert at the selection.</p>
+
+                @foreach ($this->paletteGroups as $group)
+                    <h3 class="fpb-palette-group">{{ $group['label'] }}</h3>
+                    <ul class="fpb-palette-list">
+                        @foreach ($group['items'] as $item)
+                            <li>
+                                <button
+                                    type="button"
+                                    class="fpb-palette-item"
+                                    draggable="true"
+                                    data-type="{{ $item['type'] }}"
+                                    x-on:dragstart="startInsert($event, '{{ $item['type'] }}')"
+                                    x-on:dragend="clearDrag()"
+                                    wire:click="insertBlock('{{ $item['type'] }}')"
+                                >
+                                    @if ($item['icon'])
+                                        <x-filament::icon :icon="$item['icon']" class="fpb-palette-icon" />
+                                    @endif
+                                    <span>{{ $item['label'] }}</span>
+                                </button>
+                            </li>
+                        @endforeach
+                    </ul>
                 @endforeach
-            </ul>
+            </div>
+
+            <div x-show="sideTab === 'structure'" x-cloak>
+                <h2 class="fpb-panel-title">Document</h2>
+                <p class="fpb-panel-hint">Click a block to select it. The outline follows the page.</p>
+
+                @if ($this->structure === [])
+                    <p class="fpb-panel-hint">This page has no blocks yet.</p>
+                @else
+                    <ol class="fpb-structure">
+                        @foreach ($this->structure as $node)
+                            @include('page-builder::structure-node', ['node' => $node, 'depth' => 0])
+                        @endforeach
+                    </ol>
+                @endif
+            </div>
 
             <dl class="fpb-shortcuts">
                 <dt>&#8984;Z</dt><dd>Undo</dd>
@@ -48,107 +139,25 @@
 
         {{-- Canvas --}}
         <main class="fpb-canvas-wrap">
-            <div class="fpb-toolbar">
-                <span class="fpb-status" @class(['fpb-status-dirty' => $this->isDirty])>
-                    {{ $this->isDirty ? 'Unsaved changes' : 'All changes saved' }}
-                </span>
-
-                <div class="fpb-toolbar-actions">
-                    <x-filament::icon-button
-                        icon="heroicon-m-arrow-uturn-left"
-                        label="Undo"
-                        color="gray"
-                        size="sm"
-                        wire:click="undo"
-                        :disabled="! $this->canUndo"
-                    />
-
-                    <x-filament::icon-button
-                        icon="heroicon-m-arrow-uturn-right"
-                        label="Redo"
-                        color="gray"
-                        size="sm"
-                        wire:click="redo"
-                        :disabled="! $this->canRedo"
-                    />
-
-                    @if ($formEditorUrl = $this->formEditorUrl())
-                        <x-filament::button
-                            tag="a"
-                            href="{{ $formEditorUrl }}"
-                            color="gray"
-                            size="sm"
-                        >
-                            Form editor
-                        </x-filament::button>
+            <div class="fpb-canvas-frame">
+                <div
+                    class="fpb-canvas"
+                    :data-preview="preview"
+                    x-on:dragover.prevent="onDragOver($event)"
+                    x-on:drop.prevent="onDrop($event)"
+                    x-on:dragleave="onDragLeave($event)"
+                >
+                    {{-- Application supplied design tokens and block styles, so the canvas
+                         renders blocks exactly as the public site does. --}}
+                    @if ($stylesView = $this->canvasStylesView())
+                        @include($stylesView)
                     @endif
-
-                    <x-filament::button
-                        wire:click="save"
-                        wire:loading.attr="disabled"
-                        size="sm"
-                    >
-                        Save layout
-                    </x-filament::button>
+                    @forelse ($this->rootBlocks as $block)
+                        <x-page-builder::canvas-block :block="$block" :selected-id="$this->selectedId" />
+                    @empty
+                        <p class="fpb-empty">This page has no blocks yet. Drag one in from the left, or drop a section to start a layout.</p>
+                    @endforelse
                 </div>
-            </div>
-
-            <div
-                class="fpb-canvas"
-                x-on:dragover.prevent="onDragOver($event)"
-                x-on:drop.prevent="onDrop($event)"
-                x-on:dragleave="onDragLeave($event)"
-            >
-                {{-- Application supplied design tokens and block styles, so the canvas
-                     renders blocks exactly as the public site does. --}}
-                @if ($stylesView = $this->canvasStylesView())
-                    @include($stylesView)
-                @endif
-                @forelse ($this->renderableBlocks as $index => $block)
-                    <div
-                        class="fpb-block"
-                        data-id="{{ $block['id'] }}"
-                        data-index="{{ $index }}"
-                        data-has-content="{{ $block['hasContent'] ? 'true' : 'false' }}"
-                        draggable="true"
-                        @if ($this->selectedId === $block['id']) data-selected="true" @endif
-                        @unless ($block['isKnown']) data-unknown="true" @endunless
-                        x-on:dragstart="startMove($event, '{{ $block['id'] }}')"
-                        x-on:dragend="clearDrag()"
-                        wire:click="selectBlock('{{ $block['id'] }}')"
-                        wire:key="fpb-block-{{ $block['id'] }}"
-                    >
-                        <div class="fpb-block-bar">
-                            <span class="fpb-block-label">{{ $block['label'] }}</span>
-                            <span class="fpb-block-tools">
-                                <button type="button" title="Duplicate"
-                                        wire:click.stop="duplicateBlock('{{ $block['id'] }}')">⧉</button>
-                                <button type="button" title="Delete"
-                                        x-on:click.stop="remove('{{ $block['id'] }}', {{ $block['hasContent'] ? 'true' : 'false' }})">✕</button>
-                            </span>
-                        </div>
-
-                        <div class="fpb-block-body">
-                            @if ($block['isKnown'] && $block['view'])
-                                {{-- While this is set, `@editable` inside the block's own
-                                     markup expands to editing attributes. Off the canvas
-                                     it expands to nothing, so the public page ships the
-                                     same markup without them. --}}
-                                @php(PageBuilder::editing($block['id'], $block['type']))
-                                <x-dynamic-component :component="$block['view']" :data="$block['data']" />
-                                @php(PageBuilder::idle())
-                            @elseif (! $block['isKnown'])
-                                <p class="fpb-block-retired">
-                                    This page holds a <code>{{ $block['type'] }}</code> block, which this
-                                    site no longer offers. Its content is kept and saved untouched; it
-                                    cannot be shown or edited here.
-                                </p>
-                            @endif
-                        </div>
-                    </div>
-                @empty
-                    <p class="fpb-empty">This page has no blocks yet. Drag one in from the left.</p>
-                @endforelse
             </div>
         </main>
 
@@ -159,19 +168,48 @@
             </h2>
 
             @if (! $this->selectedId)
-                <p class="fpb-panel-hint">Click a block on the page to edit it.</p>
-            @elseif ($this->isSelectedBlockEditable())
-                {{ $this->form }}
-            @elseif (! $this->isSelectedBlockKnown())
-                <p class="fpb-panel-hint">
-                    This block's type is no longer registered, so there are no fields to show.
-                    Its stored content is preserved. You can still move or remove it.
-                </p>
+                <p class="fpb-panel-hint">Click a block on the page to edit it. Use the Style tab for spacing, width and alignment.</p>
             @else
-                <p class="fpb-panel-hint">
-                    You do not have permission to edit this block's content. You can still
-                    move or remove it.
-                </p>
+                <div class="fpb-inspector-tabs" role="tablist">
+                    <button type="button" class="fpb-side-tab" :data-active="inspectorTab === 'content'" x-on:click="inspectorTab = 'content'">Content</button>
+                    <button type="button" class="fpb-side-tab" :data-active="inspectorTab === 'style'" x-on:click="inspectorTab = 'style'">Style</button>
+                </div>
+
+                <div x-show="inspectorTab === 'content'">
+                    @if ($this->isSelectedBlockEditable())
+                        {{ $this->form }}
+                    @elseif (! $this->isSelectedBlockKnown())
+                        <p class="fpb-panel-hint">
+                            This block's type is no longer registered, so there are no fields to show.
+                            Its stored content is preserved. You can still move or remove it.
+                        </p>
+                    @else
+                        <p class="fpb-panel-hint">
+                            You do not have permission to edit this block's content. You can still
+                            move or remove it.
+                        </p>
+                    @endif
+                </div>
+
+                <div x-show="inspectorTab === 'style'" x-cloak>
+                    <p class="fpb-panel-hint">Tokens from your theme, not raw CSS.</p>
+
+                    @foreach ($this->styleTokens() as $token => $options)
+                        <label class="fpb-style-field">
+                            <span>{{ ucfirst($token) }}</span>
+                            <select wire:model.live="blockSettings.{{ $token }}">
+                                <option value="">Default</option>
+                                @foreach ($options as $value => $label)
+                                    @if (is_int($value))
+                                        <option value="{{ $label }}">{{ $label }}</option>
+                                    @else
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endif
+                                @endforeach
+                            </select>
+                        </label>
+                    @endforeach
+                </div>
             @endif
         </aside>
     </div>

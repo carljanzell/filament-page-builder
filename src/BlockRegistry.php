@@ -2,6 +2,7 @@
 
 namespace CarlJanzell\FilamentPageBuilder;
 
+use CarlJanzell\FilamentPageBuilder\Contracts\Container;
 use CarlJanzell\FilamentPageBuilder\Contracts\PageBlock;
 use InvalidArgumentException;
 
@@ -101,5 +102,67 @@ class BlockRegistry
         $block = $this->find($type);
 
         return $block === null ? [] : $block::fileFields();
+    }
+
+    /**
+     * Whether this type can hold other blocks.
+     */
+    public function isContainer(?string $type): bool
+    {
+        $block = $this->find($type);
+
+        return $block !== null && is_subclass_of($block, Container::class);
+    }
+
+    /**
+     * Slot names a container currently exposes, or nothing for a leaf.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<int, string>
+     */
+    public function slots(?string $type, array $data = []): array
+    {
+        $block = $this->find($type);
+
+        if ($block === null || ! is_subclass_of($block, Container::class)) {
+            return [];
+        }
+
+        return $block::slots($data);
+    }
+
+    /**
+     * Starting data for a freshly dropped block, if it has any.
+     *
+     * @return array<string, mixed>
+     */
+    public function defaults(?string $type): array
+    {
+        $block = $this->find($type);
+
+        if ($block !== null && method_exists($block, 'defaults')) {
+            /** @var array<string, mixed> $defaults */
+            $defaults = $block::defaults();
+
+            return $defaults;
+        }
+
+        return [];
+    }
+
+    /**
+     * Palette group for a type. App blocks that do not declare one land in "blocks".
+     */
+    public function category(?string $type): string
+    {
+        $block = $this->find($type);
+
+        if ($block !== null && method_exists($block, 'category')) {
+            $category = $block::category();
+
+            return is_string($category) && $category !== '' ? $category : 'blocks';
+        }
+
+        return 'blocks';
     }
 }

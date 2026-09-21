@@ -25,6 +25,7 @@ class TestPanelProvider extends PanelProvider
             ])
             ->plugin(
                 FilamentPageBuilderPlugin::make()
+                    ->includeLayoutBlocks(false)
                     ->blocks([
                         HeadingBlock::class,
                         BannerBlock::class,
