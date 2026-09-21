@@ -110,11 +110,15 @@ abstract class DesignPage extends Page
     }
 
     /**
+     * Deliberately not `fpb-page`: that class marks the public page wrapper, and the
+     * rules hung off it strip a slot back to a bare grid cell. Putting it on the editor
+     * too erased the drop wells the canvas needs.
+     *
      * @return array<string>
      */
     public function getPageClasses(): array
     {
-        return ['fpb-page'];
+        return ['fpb-editor-page'];
     }
 
     /**

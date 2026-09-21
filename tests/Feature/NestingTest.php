@@ -191,3 +191,76 @@ it('walks the stored tree in document order after a nested save', function (): v
         ->and(array_column(BlockTree::childrenOf(BlockTree::hydrate($stored), 's', 'col-1'), 'type'))
         ->toBe(['text']);
 });
+
+it('renders every column of a section on the public page', function (): void {
+    $html = view('page-builder::components.blocks', [
+        'blocks' => [
+            section('s'),
+            child('a', 's', 'col-0', 'text', ['body' => 'First column, first block']),
+            child('b', 's', 'col-0', 'text', ['body' => 'First column, second block']),
+            child('c', 's', 'col-1', 'text', ['body' => 'Second column']),
+        ],
+    ])->render();
+
+    // A leaf used to pop the section's own render context, so every column after the
+    // first came back empty — on the public site only, while the canvas looked right.
+    expect($html)->toContain('First column, first block')
+        ->and($html)->toContain('First column, second block')
+        ->and($html)->toContain('Second column');
+});
+
+it('keeps a column a single grid item on the public page', function (): void {
+    $html = view('page-builder::components.blocks', [
+        'blocks' => [
+            section('s'),
+            child('a', 's', 'col-0', 'text', ['body' => 'One']),
+            child('b', 's', 'col-0', 'text', ['body' => 'Two']),
+            child('c', 's', 'col-1', 'text', ['body' => 'Three']),
+        ],
+    ])->render();
+
+    // .fpb-section is a grid. Two blocks in one column must sit inside one .fpb-slot,
+    // or the second takes the next column's cell.
+    expect(substr_count($html, 'class="fpb-slot"'))->toBe(2)
+        ->and($html)->not->toContain('data-fpb-slot=');
+
+    preg_match('/class="fpb-slot">(.*?)Three/s', $html, $first);
+
+    expect($first[1] ?? '')->toContain('One')->toContain('Two');
+});
+
+it('renders a section nested inside a column', function (): void {
+    $html = view('page-builder::components.blocks', [
+        'blocks' => [
+            section('outer'),
+            [...section('inner'), 'parent' => 'outer', 'slot' => 'col-1'],
+            child('deep', 'inner', 'col-1', 'text', ['body' => 'Two levels down']),
+            child('beside', 'outer', 'col-0', 'text', ['body' => 'Beside the inner section']),
+        ],
+    ])->render();
+
+    expect($html)->toContain('Two levels down')
+        ->and($html)->toContain('Beside the inner section')
+        ->and(substr_count($html, 'fpb-section'))->toBe(2);
+});
+
+it('leaves no render context behind after a public render', function (): void {
+    view('page-builder::components.blocks', [
+        'blocks' => [
+            section('s'),
+            child('a', 's', 'col-0', 'text', ['body' => 'Hi']),
+            child('b', 's', 'col-1', 'text', ['body' => 'There']),
+        ],
+    ])->render();
+
+    // Every push has a matching pop, so nothing leaks into the next render on the page.
+    expect(PageBuilder::isEditing())->toBeFalse()
+        ->and(PageBuilder::currentBlockId())->toBeNull();
+});
+
+it('still shows the empty drop well on the canvas', function (): void {
+    canvas(page([section('s')]))
+        ->assertSee('Drop a block here')
+        ->assertSee('data-fpb-slot="col-0"', escape: false)
+        ->assertSee('data-fpb-slot="col-1"', escape: false);
+});

@@ -139,14 +139,19 @@ class PageBuilder
     }
 
     /**
-     * The current contents of a named slot, or an empty drop well on the canvas.
+     * The current contents of a named slot, wrapped so the slot is one element.
+     *
+     * The wrapper is not decoration. A section is a grid, and without it each child
+     * block becomes its own grid item, so a column holding two blocks spills into the
+     * next one. Off the canvas the wrapper carries no editing attributes and the
+     * stylesheet strips it back to a bare grid cell.
      */
     public static function slot(string $name): string
     {
         $inner = static::$slotRenderer !== null ? (string) (static::$slotRenderer)($name) : '';
 
         if (! static::isEditing()) {
-            return $inner;
+            return '<div class="fpb-slot">'.$inner.'</div>';
         }
 
         // An empty `@foreach` still emits Blade/Livewire comment markers, which

@@ -66,7 +66,8 @@ it('opens as a full-screen editor without Filament page chrome', function (): vo
         ->and($instance->getBreadcrumbs())->toBe([])
         ->and($instance->getMaxContentWidth())->toBe(Width::Screen)
         ->and($instance->getExtraBodyAttributes()['class'])->toContain('fpb-edit-mode')
-        ->and($instance->getPageClasses())->toContain('fpb-page')
+        ->and($instance->getPageClasses())->toContain('fpb-editor-page')
+        ->and($instance->getPageClasses())->not->toContain('fpb-page')
         ->and($instance->exitUrl())->toBe(PageResource::getUrl('index'))
         ->and($instance->exitLabel())->toBe('Back to '.PageResource::getBreadcrumb());
 

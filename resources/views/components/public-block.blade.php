@@ -26,8 +26,12 @@
         @endforeach
     >
         @php
+            // Every block pushes a context, because every block pops one below. Pushing
+            // only for containers let a leaf child's idle() pop its parent's snapshot,
+            // which wiped the slot renderer and rendered every later column empty.
+            PageBuilder::rendering($block['type'], $data);
+
             if ($slotNames !== []) {
-                PageBuilder::rendering($block['type'], $data);
                 PageBuilder::provideSlots($slotNames, function (string $name) use ($block, $blocks): string {
                     $html = '';
 

@@ -176,6 +176,11 @@ top-level blocks. Use the shipped renderer, which walks the tree:
 <x-page-builder::blocks :blocks="$page->blocks" />
 ```
 
+Each column renders as a `.fpb-slot` inside its `.fpb-section`. That wrapper is what
+keeps a column's blocks in that column — a section is a grid, and without it every
+block becomes its own grid cell. Ship the package stylesheet on the public site, or
+give `.fpb-section` and `.fpb-slot` the equivalent rules in your own theme.
+
 ## Tests
 
 ```bash

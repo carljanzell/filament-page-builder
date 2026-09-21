@@ -221,15 +221,22 @@
 .fpb-section[data-fpb-ratio="1-1-1-1"] { grid-template-columns: 1fr 1fr 1fr 1fr; }
 .fpb-section[data-fpb-columns="1"] { grid-template-columns: 1fr; }
 
+/*
+ * A slot is a grid cell first and a drop target second: it exists on the public page
+ * as well, where it is what keeps a column's blocks in that column.
+ */
 .fpb-slot {
     pointer-events: auto;
+    min-width: 0;
+}
+body.fpb-edit-mode .fpb-slot {
     min-height: 4.5rem;
     border: 1px dashed rgba(37, 99, 235, 0.28);
     border-radius: 0.4rem;
     background: rgba(37, 99, 235, 0.03);
     transition: border-color 0.15s, background 0.15s;
 }
-.fpb-slot[data-drop-active="true"] {
+body.fpb-edit-mode .fpb-slot[data-drop-active="true"] {
     border-color: #2563eb;
     background: rgba(37, 99, 235, 0.1);
 }
@@ -302,9 +309,6 @@
 .fpb-el[data-fpb-align="end"] { text-align: end; }
 
 .fpb-page .fpb-section { padding: 0; }
-.fpb-page .fpb-slot {
-    border: 0; background: transparent; min-height: 0;
-}
 
 /*
  * Full-screen edit mode. The Design page is a dedicated editor, so Filament's
